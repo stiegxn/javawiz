@@ -78,9 +78,10 @@ fun computeParseInfos(tree: JCTree.JCCompilationUnit, callFixup: CallFixup): Par
         val typeNames = tree.typeDecls.filterIsInstance<JCTree.JCClassDecl>().flatMap { getTypeNames(packageDot, it) }
         val ast = generateAst(tree, callFixup)
         val conditions = generateConditions(tree)
+        val streamOps = generateStreamOps(tree)
 
         val (arrayAccesses, indexWrappers) = generateArrayAccessInfo(tree)
-        val modPoints = modificationPoints(conditions, indexWrappers)
+        val modPoints = modificationPoints(conditions, indexWrappers, streamOps)
         val content = tree.sourceFile.getCharContent(true).toString()
         val modified = applyModifications(content, modPoints)
 

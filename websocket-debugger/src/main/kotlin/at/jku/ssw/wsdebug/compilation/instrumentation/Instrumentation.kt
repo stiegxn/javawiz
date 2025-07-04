@@ -5,7 +5,7 @@ import at.jku.ssw.wsdebug.compilation.JAVAWIZ_PACKAGE
 
 data class Insert(val line: Int, val column: Int, val text: String)
 
-fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: List<IndexWrapper>): List<Insert> {
+fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: List<IndexWrapper>, streamOperation: List<StreamOperation>): List<Insert> {
     return conditions.flatMap {
         return@flatMap listOf(
             Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.recordCondition("),
@@ -16,6 +16,42 @@ fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: Li
             Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.recordArrayAccess(" + it.outerIndexedVariableName + ","),
             Insert(it.endLine, it.endColumn, "," + it.accessID + "," + it.dimension + ")")
         )
+    } + streamOperation.flatMap {
+        val inserts = mutableListOf<Insert>()
+        if (it.name == "stream") {
+            inserts.add(
+                Insert(
+                    it.endLine, it.endColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"START\", String.valueOf(x), \"" + it.name + "\", " + it.id
+                            + "))"
+                )
+            )
+        } else {
+            // Glücklicherweise ist die ID immer 0, wenn es sich um die Terminal-Operation handelt.
+            if (it.id == 0) {
+                if (it.hasParam) {
+                    inserts.add(Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceParam("))
+                    inserts.add(Insert(it.endLine, it.endColumn, ")"))
+                } else {
+                    inserts.add(Insert(it.beginLine, it.beginColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"END\", String.valueOf(x), \"" + it.name + "\", 0))"))
+                }
+            } else {
+                inserts.add(
+                    Insert(
+                        it.beginLine,
+                        it.beginColumn,
+                        ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"IN\", String.valueOf(x), \"" + it.name + "\", " + it.id + "))"
+                    )
+                )
+                inserts.add(
+                    Insert(
+                        it.endLine,
+                        it.endColumn,
+                        ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"OUT\", String.valueOf(x), \"" + it.name + "\", " + it.id + "))"
+                    )
+                )
+            }
+        }
+        return@flatMap inserts
     }
 }
 

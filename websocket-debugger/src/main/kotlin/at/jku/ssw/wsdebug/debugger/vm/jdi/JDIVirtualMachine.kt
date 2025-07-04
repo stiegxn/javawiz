@@ -42,6 +42,7 @@ class JDIVirtualMachine(
     // Stack depth -> Conditions declared in respective stack depth
     private val conditionTracer = ConditionTracer()
     private val arrayAccessTracer = newArrayAccessTracer(parseInfos)
+    private val streamOperationTracer = StreamOperationTracer()
 
     private val inputBufferTracer: InputBufferTracer = InputBufferTracer()
 
@@ -287,6 +288,31 @@ class JDIVirtualMachine(
                     objectID = arrayObjectID,
                     dimension = dimension
                 )
+            }
+
+            "traceStream" -> {
+                val direction = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("direction")!!) as StringReference).value()
+                val elem = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!) as StringReference).value()
+                val operationName = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("name")!!) as StringReference).value()
+                val operationId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("id")!!) as IntegerValue).value()
+                when (direction) {
+                    "START" -> streamOperationTracer.traceStartStream(operationName, operationId, elem)
+                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, elem)
+                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, elem)
+                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId)
+                    else -> streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf(0), elem)
+                }
+
+                // For Testing only, delete later
+                println("Test value")
+                println("Stream operation: $direction, $elem, $operationName, $operationId")
+                println(streamOperationTracer.sequenceCounter)
+                println(streamOperationTracer.lastTraceValue)
+                println(streamOperationTracer.streamtrace)
+            }
+
+            "traceParam" -> {
+                // TODO: implement this
             }
 
             else -> error("unknown method type in class $JAVAWIZ_CLASS: ${javaWizFrame.location().method().name()}")
