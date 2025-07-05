@@ -106,6 +106,22 @@ class StreamOperationTracer {
             }
         }
     }
+
+    fun collectAndTransformStreamOperationValues() : List<StreamMarbleNode> {
+        // transform the streamtrace into a list of MarbleNodes
+
+        val nodes = mutableListOf<StreamMarbleNode>()
+        for (op in streamtrace) {
+            val x = op.seq * 100 - 50
+            val y = op.operationID * 100 + 50
+            val parents = op.parentIDs.mapNotNull {
+                parentId -> nodes.find { it.elemId == "$parentId.${op.operationID-1}" }
+            }
+            nodes.add(StreamMarbleNode(op.seq, "${op.elementID}.${op.operationID}", x, y, op.value, parents, op.operationID, op.type, op.elementID))
+        }
+
+        return nodes
+    }
 }
 
 data class StreamOperationValue(
@@ -114,6 +130,18 @@ data class StreamOperationValue(
     val direction: String,
     val operationID: Int,
     val elementID: Int,
-    val parentIDs: MutableList<Int>,
+    val parentIDs: List<Int>,
     val value: String,
+) { }
+
+data class StreamMarbleNode(
+    val id: Int,
+    val elemId: String,
+    val x: Int,
+    val y: Int,
+    val label: String,
+    val parents: List<StreamMarbleNode>,
+    val operationID: Int,
+    val type: String,
+    val color: Int,
 ) { }

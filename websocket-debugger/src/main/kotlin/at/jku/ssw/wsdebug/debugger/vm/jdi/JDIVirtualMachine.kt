@@ -230,6 +230,8 @@ class JDIVirtualMachine(
             conditionTracer.collectConditionValuesForStepEvent(event.thread().frameCount()),
             // create copy of conditions so that we serialize the current state of evaluated
             arrayAccessTracer.collectAccessValuesForStepEvent(event.thread().frameCount()),
+            // ToDo: Replace with a function that transforms the stream trace into marble nodes
+            streamOperationTracer.collectAndTransformStreamOperationValues(),
             streamToString(debuggeeOutput),
             streamToString(debuggeeError),
             inputSinceLastStep,
