@@ -10,6 +10,12 @@ class StreamOperationTracer {
     var sequenceCounter = 1
     var elementcounter = 1
 
+    var visualizationObjects = StreamVisualizationObjects(
+        marbles = mutableListOf(),
+        links = mutableListOf(),
+        lines = mutableMapOf()
+    )
+
     fun addStreamOperationValue(
         type: String,
         direction: String,
@@ -107,24 +113,38 @@ class StreamOperationTracer {
         }
     }
 
-    fun collectAndTransformStreamOperationValues() : List<StreamMarbleNode> {
-        // transform the streamtrace into a list of MarbleNodes
-
-        val nodes = mutableListOf<StreamMarbleNode>()
-        for (op in streamtrace) {
-            val x = op.seq * 100 - 50
-            val y = op.operationID * 100 + 50
-            val parents = op.parentIDs.mapNotNull {
-                parentId -> nodes.find { it.elemId == "$parentId.${op.operationID-1}" }
+    fun collectAndTransformStreamOperationValues() : StreamVisualizationObjects {
+        // transform the streamtrace into a list of MarbleNodes, links and lines
+        // Don't iterate, store marbles because of performance issues
+        val nodes = visualizationObjects.marbles
+        val links = visualizationObjects.links
+        val lines = visualizationObjects.lines
+        val nextop = streamtrace.lastOrNull()
+        if (nextop != null) {
+            if (!lines.containsKey(nextop.operationID)) {
+                lines[nextop.operationID] = StreamOperationLine(nextop.type, lines.size * 100 + 50, lines.size * 100 + 50)
             }
-            nodes.add(StreamMarbleNode(op.seq, "${op.elementID}.${op.operationID}", x, y, op.value, parents, op.operationID, op.type, op.elementID))
+            if (nextop.seq > 0) {
+                val x = nextop.seq * 100 - lines[nextop.operationID]!!.x
+                val y = lines[nextop.operationID]!!.y
+                val elemId = "${nextop.elementID}.${nextop.operationID}"
+                val parents = nextop.parentIDs.mapNotNull { parentId ->
+                    nodes.find { it.elemId == "$parentId.${nextop.operationID + 1}" }
+                }
+                if (parents.isNotEmpty()) {
+                    parents.forEach { x -> links.add(StreamLink(x.elemId, elemId)) }
+                }
+                nodes.add(StreamMarbleNode(nextop.seq, elemId, x, y, nextop.value, nextop.operationID, nextop.type, nextop.elementID))
+            }
         }
-
-        return nodes
+        println(nodes)
+        println(links)
+        println(lines)
+        return visualizationObjects
     }
 }
 
-data class StreamOperationValue(
+data class StreamOperationValue (
     val seq: Int,
     val type: String,
     val direction: String,
@@ -132,16 +152,32 @@ data class StreamOperationValue(
     val elementID: Int,
     val parentIDs: List<Int>,
     val value: String,
-) { }
+)
 
-data class StreamMarbleNode(
+data class StreamMarbleNode (
     val id: Int,
     val elemId: String,
     val x: Int,
     val y: Int,
     val label: String,
-    val parents: List<StreamMarbleNode>,
     val operationID: Int,
     val type: String,
-    val color: Int,
-) { }
+    val color: Int
+)
+
+data class StreamLink (
+    val source: String,
+    val target: String
+)
+
+data class StreamOperationLine (
+    val type: String,
+    val y: Int,
+    val x: Int
+)
+
+data class StreamVisualizationObjects (
+    val marbles : MutableList<StreamMarbleNode>,
+    val links : MutableList<StreamLink>,
+    val lines : MutableMap<Int, StreamOperationLine>
+)

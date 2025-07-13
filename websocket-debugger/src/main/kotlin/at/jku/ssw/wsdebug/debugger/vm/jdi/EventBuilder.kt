@@ -13,7 +13,7 @@ fun buildTraceState(
     lineNumber: Int,
     conditionValues: Map<Int, Set<ConditionValue>>,
     arrayAccessValues: Map<Int, Set<ArrayAccessValue>>,
-    streamOperationValues: List<StreamMarbleNode>,
+    streamOperationValues: StreamVisualizationObjects,
     output: String,
     error: String,
     input: String,
@@ -52,7 +52,8 @@ fun buildTraceState(
         output,
         error,
         input,
-        inputBufferInfo
+        inputBufferInfo,
+        streamOperationValues
     )
 }
 
