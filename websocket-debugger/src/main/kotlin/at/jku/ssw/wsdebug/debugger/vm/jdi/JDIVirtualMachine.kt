@@ -296,11 +296,12 @@ class JDIVirtualMachine(
                 val elem = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!) as StringReference).value()
                 val operationName = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("name")!!) as StringReference).value()
                 val operationId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("id")!!) as IntegerValue).value()
+                val streamId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("streamId")!!) as IntegerValue).value()
                 when (direction) {
-                    "START" -> streamOperationTracer.traceStartStream(operationName, operationId, elem)
-                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, elem)
-                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, elem)
-                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId)
+                    "START" -> streamOperationTracer.traceStartStream(operationName, operationId, elem, streamId)
+                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, elem, streamId)
+                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, elem, streamId)
+                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId)
                     else -> streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf(0), elem)
                 }
 

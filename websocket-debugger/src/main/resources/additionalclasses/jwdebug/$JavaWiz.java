@@ -8,8 +8,6 @@ public class $JavaWiz {
         return index;
     }
 
-    public static void traceStream(String direction, String elem, String name, int id) {
-        System.out.println("Test " + direction + " " + elem + " " + name + " " + id);
-    }
+    public static void traceStream(String direction, String elem, String name, int id, int streamId) {}
     public static void traceParam() {}
 }

@@ -21,7 +21,8 @@ fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: Li
         if (it.name == "stream") {
             inserts.add(
                 Insert(
-                    it.endLine, it.endColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"START\", String.valueOf(x), \"" + it.name + "\", " + it.id
+                    it.endLine, it.endColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"START\", String.valueOf(x), \"" + it.name + "\", " + it.id + ", " + it
+                        .streamID
                             + "))"
                 )
             )
@@ -32,21 +33,23 @@ fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: Li
                     inserts.add(Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceParam("))
                     inserts.add(Insert(it.endLine, it.endColumn, ")"))
                 } else {
-                    inserts.add(Insert(it.beginLine, it.beginColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"END\", String.valueOf(x), \"" + it.name + "\", 0))"))
+                    inserts.add(Insert(it.beginLine, it.beginColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"END\", String.valueOf(x), \"" + it.name + "\", 0, "
+                    + it.streamID + ")" +
+                            ")"))
                 }
             } else {
                 inserts.add(
                     Insert(
                         it.beginLine,
                         it.beginColumn,
-                        ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"IN\", String.valueOf(x), \"" + it.name + "\", " + it.id + "))"
+                        ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"IN\", String.valueOf(x), \"" + it.name + "\", " + it.id + ", " + it.streamID + "))"
                     )
                 )
                 inserts.add(
                     Insert(
                         it.endLine,
                         it.endColumn,
-                        ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"OUT\", String.valueOf(x), \"" + it.name + "\", " + it.id + "))"
+                        ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"OUT\", String.valueOf(x), \"" + it.name + "\", " + it.id + ", " + it.streamID + "))"
                     )
                 )
             }

@@ -13,6 +13,11 @@ fun generateStreamOps(tree: JCTree.JCCompilationUnit) : List<StreamOperation> {
 class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
 
     override fun visitApply(methodInvocation: JCTree.JCMethodInvocation) {
+        if (lambdaLevel > 0) {
+            // Skip method invocations inside lambdas
+            super.visitApply(methodInvocation)
+            return
+        }
         val meth = methodInvocation.meth
         if (meth is JCTree.JCFieldAccess) {
             var beginLine: Int
@@ -21,6 +26,11 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
             val receiverType = meth.selected.type?.tsym.toString()
             if (isStreamType(receiverType)) {
                 val name = meth.name.toString()
+                if (name in terminalOperations) {
+                    actualStreamID = ++numberOfStreams
+                    openStreams.add(numberOfStreams)
+                    streamOperations[actualStreamID] = mutableListOf()
+                }
                 if (name == "max" || name == "min") {
                     if (methodInvocation.args.isNotEmpty()) {
                         hasParam = true
@@ -34,33 +44,43 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     beginLine = pos.getBeginLineStreamOp(meth)
                     beginColumn = pos.getBeginColumnStreamOp(meth)
                 }
-                streamOperations.add(StreamOperation(
+                streamOperations[actualStreamID]!!.add(StreamOperation(
                     beginLine,
                     beginColumn,
                     pos.getEndLine(methodInvocation) - 1,
                     pos.getEndColumn(methodInvocation) - 1,
                     meth.name.toString(),
-                    streamOperations.size,
-                    hasParam
+                    streamOperations[actualStreamID]!!.size,
+                    hasParam,
+                    actualStreamID
                 ))
             } else if (meth.name.toString() == "stream") {
-                streamOperations.add(StreamOperation(
+                streamOperations[actualStreamID]!!.add(StreamOperation(
                     0,
                     0,
                     pos.getEndLine(methodInvocation) - 1,
                     pos.getEndColumn(methodInvocation) - 1,
                     "stream",
-                    streamOperations.size
+                    streamOperations[actualStreamID]!!.size,
+                    false,
+                    actualStreamID
                 ))
+                openStreams.remove(actualStreamID)
+                actualStreamID = openStreams.lastOrNull() ?: -1
             }
         }
         super.visitApply(methodInvocation)
     }
 
-    private val streamOperations = mutableListOf<StreamOperation>()
+    private val streamOperations = mutableMapOf<Int, MutableList<StreamOperation>>()
+    private val openStreams = mutableListOf<Int>()
+    private var numberOfStreams = -1
+    private var actualStreamID = -1
+    private val terminalOperations = setOf("count", "max", "min", "reduce", "collect", "forEach", "toArray")
+    private var lambdaLevel = 0
 
     fun getStreamOperations(): List<StreamOperation> {
-        return streamOperations.toList()
+        return streamOperations.values.flatten()//streamOperations.toList()
     }
 
     private fun isStreamType(type: String?): Boolean {
@@ -70,5 +90,17 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                 type == "java.util.stream.IntStream" ||
                 type == "java.util.stream.LongStream" ||
                 type == "java.util.stream.DoubleStream"
+    }
+
+    override fun visitLambda(tree: JCTree.JCLambda) {
+        lambdaLevel++
+        super.visitLambda(tree)
+        lambdaLevel--
+    }
+
+    override fun visitReference(tree: JCTree.JCMemberReference) {
+        lambdaLevel++
+        super.visitReference(tree)
+        lambdaLevel--
     }
 }
