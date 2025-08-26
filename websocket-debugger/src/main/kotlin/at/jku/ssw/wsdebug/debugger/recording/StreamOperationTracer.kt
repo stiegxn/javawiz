@@ -147,7 +147,6 @@ class StreamOperationTracer {
         val nodes = visualizationObjects.marbles
         val links = visualizationObjects.links
         val lines = visualizationObjects.lines
-        // ToDo
         val nextop = streamtrace[actualStreamID]?.lastOrNull()
         var lastopID = visualizationObjects.lastopID
         if (nextop != null) {
@@ -242,7 +241,7 @@ data class StreamVisualizationObjects (
         links.clear()
         lines.clear()
         lastx = 50
-        lastopID = 0
+        lastopID = Int.MAX_VALUE
     }
 
     fun marblesToJson(): String {
