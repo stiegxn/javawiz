@@ -14,12 +14,12 @@ class StreamOperationTracer {
     var sequenceCounter = mutableMapOf<Int, Int>()
     var elementcounter = 1
 
-    var visualizationObjects = StreamVisualizationObjects(
+    var visualizationObjects = StreamVisualizationInfo(
         marbles = mutableListOf(),
         links = mutableListOf(),
-        lines = mutableMapOf(),
-        lastx = 50,
-        lastopID = Int.MAX_VALUE
+        operationLines = mutableMapOf(),
+        lastX = 50,
+        lastOpId = Int.MAX_VALUE
     )
 
     fun addStreamOperationValue(
@@ -141,26 +141,27 @@ class StreamOperationTracer {
         }
     }
 
-    fun collectAndTransformStreamOperationValues() : StreamVisualizationObjects {
+    fun collectAndTransformStreamOperationValues() : StreamVisualizationInfo {
         // transform the streamtrace into a list of MarbleNodes, links and lines
         // Don't iterate, store marbles because of performance issues
         val nodes = visualizationObjects.marbles
         val links = visualizationObjects.links
-        val lines = visualizationObjects.lines
+        val lines = visualizationObjects.operationLines
+        // ToDo
         val nextop = streamtrace[actualStreamID]?.lastOrNull()
-        var lastopID = visualizationObjects.lastopID
+        var lastopID = visualizationObjects.lastOpId
         if (nextop != null) {
             if (!lines.containsKey(nextop.operationID)) {
                 lines[nextop.operationID] = StreamOperationLine(nextop.type, lines.size * 100 + 50)
             }
             if (nextop.seq > 0) {
                 val x = if (nextop.operationID < lastopID) {
-                    visualizationObjects.lastx
+                    visualizationObjects.lastX
                 } else {
-                    visualizationObjects.lastx += 100
-                    visualizationObjects.lastx
+                    visualizationObjects.lastX += 100
+                    visualizationObjects.lastX
                 }
-                visualizationObjects.lastopID = nextop.operationID
+                visualizationObjects.lastOpId = nextop.operationID
                 val y = lines[nextop.operationID]!!.y
                 val elemId = "${nextop.elementID}.${nextop.operationID}"
                 val parents = nextop.parentIDs.mapNotNull { parentId ->
@@ -175,7 +176,7 @@ class StreamOperationTracer {
                     //}
                     parents.forEach { x -> links.add(StreamLink(x.elemId, elemId, visibleAt)) }
                 }
-                nodes.add(StreamMarbleNode(nextop.seq, elemId, x, y, nextop.value, nextop.operationID, nextop.type, getMarbleColor(nextop.elementID)))
+                nodes.add(StreamMarble(nextop.seq, elemId, x, y, nextop.value, nextop.operationID, nextop.type, getMarbleColor(nextop.elementID)))
             }
         }
         println(visualizationObjects.marblesToJson())
@@ -205,7 +206,7 @@ data class StreamOperationValue (
     val value: String,
 )
 
-data class StreamMarbleNode(
+data class StreamMarble(
     val id: Int,
     val elemId: String,
     val x: Int,
@@ -229,19 +230,19 @@ data class StreamOperationLine (
     val y: Int
 )
 
-data class StreamVisualizationObjects (
-    val marbles : MutableList<StreamMarbleNode>,
+data class StreamVisualizationInfo (
+    val marbles : MutableList<StreamMarble>,
     val links : MutableList<StreamLink>,
-    val lines : MutableMap<Int, StreamOperationLine>,
-    var lastx : Int,
-    var lastopID: Int
+    val operationLines : MutableMap<Int, StreamOperationLine>,
+    var lastX : Int,
+    var lastOpId: Int
 ) {
     fun reset() {
         marbles.clear()
         links.clear()
-        lines.clear()
-        lastx = 50
-        lastopID = Int.MAX_VALUE
+        operationLines.clear()
+        lastX = 50
+        lastOpId = 0
     }
 
     fun marblesToJson(): String {
@@ -258,7 +259,7 @@ data class StreamVisualizationObjects (
     }
 
     fun linesToJson(): String {
-        return lines.entries.joinToString(separator = ",", prefix = "[", postfix = "]") {
+        return operationLines.entries.joinToString(separator = ",", prefix = "[", postfix = "]") {
             """{"type": "${it.value.type}", "y": ${it.value.y}}"""
         }
     }

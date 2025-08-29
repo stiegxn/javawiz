@@ -48,7 +48,8 @@ export class Trace {
       timeIdx: this.getTimeIdx(stateIndex),
       arrows: this.getArrows(stateIndex),
       timeIdxStateIdxMap: this.getTimeIdxStateIdxMap(),
-      visitedLines: this.getVisitedLines()
+      visitedLines: this.getVisitedLines(),
+      streamVizInfo: this.getStreamVizInfo(stateIndex) //TODO: see getInputBufferInfo
     }
   }
 
@@ -96,6 +97,11 @@ export class Trace {
 
   private getInputBufferInfo (stateIndex: number): InputBufferInfo {
     return this.trace[stateIndex].inputBufferInfo
+  }
+
+  private getStreamVizInfo (stateIndex: number): StreamVizInfo {
+    console.log(this.trace[stateIndex])
+    return this.trace[stateIndex].streamVizInfo
   }
 
   end (lastStates: TraceState[]) {

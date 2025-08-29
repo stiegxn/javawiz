@@ -22,6 +22,8 @@ export const SEQUENCEDIAGRAM = 8
 
 export const INVIZ = 9
 
+export const STREAMVIZ = 10
+
 export const FEATURE_FLAGS = {
   EDITOR,
   CONSOLE,
@@ -32,7 +34,8 @@ export const FEATURE_FLAGS = {
   LINKEDLIST,
   BINARYTREE,
   SEQUENCEDIAGRAM,
-  INVIZ
+  INVIZ,
+  STREAMVIZ
 }
 
 // 0 visible = Editor (in web mode)
@@ -40,7 +43,7 @@ export const FEATURE_FLAGS = {
 // 2 visible = Flow chart
 // 3 visible = Heap+Stack
 // rest hidden = see above
-export const DEFAULT_PANE_VISIBILITY = [true, true, true, true, false, false, false, false, false, false]
+export const DEFAULT_PANE_VISIBILITY = [true, true, true, true, false, false, false, false, false, false, false]
 
 export const LAYOUT_ONE = 0
 export const LAYOUT_TWO_VERTICALSPLIT = 1
@@ -104,7 +107,8 @@ export const usePaneVisibilityStore = defineStore('paneVisibility', {
       6: -1,
       7: -1,
       8: -1,
-      9: -1
+      9: -1,
+      10: -1
     }
 
     for (let i = 0; i < panelToPane.length; i++) {
@@ -156,6 +160,9 @@ export const usePaneVisibilityStore = defineStore('paneVisibility', {
     isInputOutputPaneShown: function (): boolean {
       return this.isPaneShown(INVIZ)
     },
+    isStreamVizPaneShown: function (): boolean {
+      return this.isPaneShown(STREAMVIZ)
+    },
     // HIDDEN
     isPaneHidden: function () {
       return (paneIndex: number) => !this.isPaneShown(paneIndex)
@@ -189,6 +196,9 @@ export const usePaneVisibilityStore = defineStore('paneVisibility', {
     },
     isInputOutputPaneHidden: function (): boolean {
       return this.isPaneHidden(INVIZ)
+    },
+    isStreamVizPaneHidden: function (): boolean {
+      return this.isPaneHidden(STREAMVIZ)
     }
   },
   actions: {
@@ -223,6 +233,9 @@ export const usePaneVisibilityStore = defineStore('paneVisibility', {
     showInputOutputPane: function () {
       this.showPane(CONSOLE)
     },
+    showStreamVizPane: function () {
+      this.showPane(STREAMVIZ)
+    },
     // HIDE
     hideEditorPane: function () {
       this.hidePane(EDITOR)
@@ -253,6 +266,9 @@ export const usePaneVisibilityStore = defineStore('paneVisibility', {
     },
     hideInputOutputPane: function () {
       this.hidePane(INVIZ)
+    },
+    hideStreamVizPane: function () {
+      this.hidePane(STREAMVIZ)
     },
     // GENERAL
     showPane (pane: number, showOnPanel: number = -1) {
