@@ -19,5 +19,7 @@ type TraceData = {
   boxes: Box[],
   arrows: Arrow[],
   timeIdxStateIdxMap: Map<number, number>,
-  visitedLines: number[]
+  visitedLines: number[],
+  //TODO: typen aus Kotlin übernehmen
+  streamVizInfo: StreamVizInfo
 }

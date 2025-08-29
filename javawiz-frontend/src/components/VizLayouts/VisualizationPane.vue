@@ -14,6 +14,7 @@
     <the-tree-visualization v-if="selectedPane === BINARYTREE && generalStore.debugger.compiled" />
     <the-sequence-diagram v-if="selectedPane === SEQUENCEDIAGRAM && generalStore.debugger.compiled" />
     <the-in-viz v-if="selectedPane === INVIZ && generalStore.debugger.compiled" />
+    <the-stream-viz v-if="selectedPane === STREAMVIZ && generalStore.debugger.compiled" />
   </pane>
 </template>
 
@@ -33,7 +34,8 @@ import TheListVisualization from '@/components/DataStructureVisualizations/TheLi
 import TheTreeVisualization from '@/components/DataStructureVisualizations/TheTreeVisualization/TheTreeVisualization.vue'
 import TheSequenceDiagram from '@/components/TheSequenceDiagram/TheSequenceDiagram.vue'
 import TheInViz from '@/components/TheInViz.vue'
-import { ARRAY, BINARYTREE, DESKTEST, FLOWCHART, HEAP, INVIZ, LINKEDLIST, SEQUENCEDIAGRAM, usePaneVisibilityStore } from '@/store/PaneVisibilityStore'
+import { ARRAY, BINARYTREE, DESKTEST, FLOWCHART, HEAP, INVIZ, LINKEDLIST, SEQUENCEDIAGRAM, STREAMVIZ, usePaneVisibilityStore } from '@/store/PaneVisibilityStore'
+import TheStreamViz from "@/components/TheStreamViz.vue";
 
 defineComponent({
   components: {
@@ -48,7 +50,8 @@ defineComponent({
     BeforeCompilationText,
     CompilationSpinner,
     VizChooser,
-    Pane
+    Pane,
+    TheStreamViz
   }
 })
 const { panelNr } = defineProps<{ panelNr: number }>()

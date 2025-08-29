@@ -33,13 +33,17 @@
         :tooltip="{ text: sequenceDiagramText, arrow: 'left', placement: 'below' }"
         :icon="sequencediagram"
         @action="() => { emit('selected', SEQUENCEDIAGRAM) }" />
+      <IconWithTooltip
+          :tooltip="{ text: streamVizText, arrow: 'left', placement: 'below' }"
+          :icon="sequencediagram"
+          @action="() => { emit('selected', STREAMVIZ) }" />
     </div>
   </div>
 </template>
 <script setup lang="ts">
 import { computed, defineComponent } from 'vue'
 import IconWithTooltip from '../TheToolbar/IconWithTooltip.vue'
-import { ARRAY, BINARYTREE, DESKTEST, FLOWCHART, HEAP, LINKEDLIST, INVIZ, SEQUENCEDIAGRAM, usePaneVisibilityStore } from '@/store/PaneVisibilityStore'
+import {ARRAY, BINARYTREE, DESKTEST, FLOWCHART, HEAP, LINKEDLIST, INVIZ, SEQUENCEDIAGRAM, usePaneVisibilityStore, STREAMVIZ} from '@/store/PaneVisibilityStore'
 import flowchart from '../../assets/icons/hiding/flowchart.svg'
 import stack from '../../assets/icons/hiding/stack.svg'
 import desktest from '../../assets/icons/hiding/desktest.svg'
@@ -66,4 +70,5 @@ const linkedListText = computed(() => paneVisibilityStore.isListPaneHidden ? 'Sh
 const binaryTreeText = computed(() => paneVisibilityStore.isTreePaneHidden ? 'Show Binary Trees' : 'Move Binary Trees here')
 const ioText = computed(() => paneVisibilityStore.isInputOutputPaneHidden ? 'Show I/O' : 'Move I/O here')
 const sequenceDiagramText = computed(() => paneVisibilityStore.isSequenceDiagramPaneHidden ? 'Show Sequence Diagram' : 'Move Sequence Diagram')
+const streamVizText = computed(() => paneVisibilityStore.isStreamVizPaneHidden ? 'Show Stream Viz' : 'Move Stream Viz here')
 </script>

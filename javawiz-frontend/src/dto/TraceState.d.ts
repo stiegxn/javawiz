@@ -179,6 +179,7 @@ export interface TraceState {
   readonly error: string // stderr output produced since the last step
   readonly input: string // stdin since the last step
   readonly inputBufferInfo: InputBufferInfo // info on how far the input buffer was read
+  readonly streamVizInfo: any // info for stream visualization
 }
 
 export interface ProcessedTraceState {
@@ -192,6 +193,41 @@ export interface ProcessedTraceState {
   readonly heapAfterExecution: HeapItem[],
   readonly stackAfterExecution: StackFrame[],
   readonly loadedClassesAfterExecution: LoadedClass[],
+}
+
+// TODO: implement StreamVizInfo interface
+export interface StreamVizInfo {
+  readonly kind: 'StreamVizInfo',
+  readonly marbles: StreamMarble[],
+  readonly links: StreamLink[],
+  readonly operationLines: Map<number, StreamOperationLine>,
+  readonly lastX: number,
+  readonly lastOpId: number
+}
+
+interface StreamMarble {
+  readonly kind: 'StreamMarble',
+  readonly id: number,
+  readonly elemId: string,
+  readonly x: number,
+  readonly y: number,
+  readonly label: string,
+  readonly operationID: number,
+  readonly type: string,
+  readonly color: string
+}
+
+interface StreamLink {
+  readonly kind: 'StreamLink',
+  readonly source: string,
+  readonly target: string,
+  readonly visibleAt: number
+}
+
+interface StreamOperationLine {
+  readonly kind: 'StreamOperationLine',
+  readonly type: string,
+  readonly y: number
 }
 
 export type Recordable = Val | Var | LocalVar | HeapItem | StackFrame | LoadedClass | TraceState | ProcessedTraceState | InputBufferInfo

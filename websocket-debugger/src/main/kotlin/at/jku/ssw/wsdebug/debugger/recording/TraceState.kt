@@ -11,5 +11,5 @@ data class TraceState(
     val error: String, // stderr output produced since the last step
     val input: String, // stdin since the last step
     val inputBufferInfo: InputBufferInfo, // info on how far the buffer in the modified In.java class has read
-    val streamTracer: StreamVisualizationObjects // stream tracer values, i.e., the operations on streams that have been executed
+    val streamVizInfo: StreamVisualizationInfo // stream tracer values, i.e., the operations on streams that have been executed
 ) : Recordable
