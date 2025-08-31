@@ -10,4 +10,5 @@ public class $JavaWiz {
 
     public static void traceStream(String direction, String elem, String name, int id, int streamId) {}
     public static void traceParam() {}
+    public static void collectAndTransformStreamOperationValues() {}
 }

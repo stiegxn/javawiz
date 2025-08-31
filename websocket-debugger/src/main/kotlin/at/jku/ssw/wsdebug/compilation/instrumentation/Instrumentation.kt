@@ -31,11 +31,12 @@ fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: Li
             if (it.id == 0) {
                 if (it.hasParam) {
                     inserts.add(Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceParam("))
-                    inserts.add(Insert(it.endLine, it.endColumn, ")"))
+                    inserts.add(Insert(it.endLine, it.endColumn, "); $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.collectAndTransformStreamOperationValues()"))
                 } else {
                     inserts.add(Insert(it.beginLine, it.beginColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"END\", String.valueOf(x), \"" + it.name + "\", 0, "
                     + it.streamID + ")" +
                             ")"))
+                    inserts.add(Insert(it.endLine, it.endColumn, "; $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.collectAndTransformStreamOperationValues()"))
                 }
             } else {
                 inserts.add(

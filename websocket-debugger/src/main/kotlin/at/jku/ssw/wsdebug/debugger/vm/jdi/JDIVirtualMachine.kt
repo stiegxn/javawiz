@@ -230,7 +230,8 @@ class JDIVirtualMachine(
             conditionTracer.collectConditionValuesForStepEvent(event.thread().frameCount()),
             // create copy of conditions so that we serialize the current state of evaluated
             arrayAccessTracer.collectAccessValuesForStepEvent(event.thread().frameCount()),
-            streamOperationTracer.collectAndTransformStreamOperationValues(),
+            //streamOperationTracer.collectAndTransformStreamOperationValues(),
+            streamOperationTracer.visualizationObjects,
             streamToString(debuggeeOutput),
             streamToString(debuggeeError),
             inputSinceLastStep,
@@ -315,6 +316,10 @@ class JDIVirtualMachine(
 
             "traceParam" -> {
                 // TODO: implement this
+            }
+
+            "collectAndTransformStreamOperationValues" -> {
+                streamOperationTracer.collectAndTransformStreamOperationValues()
             }
 
             else -> error("unknown method type in class $JAVAWIZ_CLASS: ${javaWizFrame.location().method().name()}")

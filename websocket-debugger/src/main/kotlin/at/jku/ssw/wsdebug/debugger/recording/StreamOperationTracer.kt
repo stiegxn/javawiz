@@ -141,51 +141,70 @@ class StreamOperationTracer {
         }
     }
 
-    fun collectAndTransformStreamOperationValues() : StreamVisualizationInfo {
-        // transform the streamtrace into a list of MarbleNodes, links and lines
-        // Don't iterate, store marbles because of performance issues
+    fun collectAndTransformStreamOperationValues(): StreamVisualizationInfo {
+        visualizationObjects.reset()
         val nodes = visualizationObjects.marbles
         val links = visualizationObjects.links
         val lines = visualizationObjects.operationLines
-        // ToDo
-        val nextop = streamtrace[actualStreamID]?.lastOrNull()
+
+        val operations = streamtrace[actualStreamID] ?: mutableListOf()
         var lastopID = visualizationObjects.lastOpId
-        if (nextop != null) {
-            if (!lines.containsKey(nextop.operationID)) {
-                lines[nextop.operationID] = StreamOperationLine(nextop.type, lines.size * 100 + 50)
+        var currentseq = 0
+        var seqOffset = 0
+
+        for (op in operations) {
+            if (!lines.containsKey(op.operationID)) {
+                lines[op.operationID] = StreamOperationLine(op.type, lines.size * 100 + 50)
             }
-            if (nextop.seq > 0) {
-                val x = if (nextop.operationID < lastopID) {
+//            currentseq = if (op.direction == "IN" && op.type == "filter") {
+//                seqOffset++
+//                currentseq + seqOffset
+//            } else {
+//                op.seq + seqOffset
+//            }
+            if (op.seq > 0 || (op.direction == "IN" && op.type == "filter")) {
+                if (op.type == "filter") {
+                    if (op.direction == "OUT") {
+                        nodes.last().color = getMarbleColor(op.elementID, false)
+                        nodes.last().direction = op.direction
+                        seqOffset--
+                        continue
+                    } else {
+                        seqOffset++
+                        currentseq += 1
+                    }
+                } else {
+                    currentseq = op.seq + seqOffset
+                }
+                val x = if (op.operationID < lastopID) {
                     visualizationObjects.lastX
                 } else {
                     visualizationObjects.lastX += 100
                     visualizationObjects.lastX
                 }
-                visualizationObjects.lastOpId = nextop.operationID
-                val y = lines[nextop.operationID]!!.y
-                val elemId = "${nextop.elementID}.${nextop.operationID}"
-                val parents = nextop.parentIDs.mapNotNull { parentId ->
-                    nodes.find { it.elemId == "$parentId.${nextop.operationID + 1}" }
+                visualizationObjects.lastOpId = op.operationID
+                val y = lines[op.operationID]!!.y
+                val elemId = "${op.elementID}.${op.operationID}"
+                val parents = op.parentIDs.mapNotNull { parentId ->
+                    nodes.find { it.elemId == "$parentId.${op.operationID + 1}" }
                 }
                 if (parents.isNotEmpty()) {
-                    // If elemId is already in the links, visibleAt is plus one, else it is the current sequence
-                    val visibleAt = //if (links.any { it.source == elemId || it.target == elemId }) {
-                        //nextop.seq + 1
-                    //} else {
-                        nextop.seq
-                    //}
-                    parents.forEach { x -> links.add(StreamLink(x.elemId, elemId, visibleAt)) }
+                    val visibleAt = currentseq
+                    parents.forEach { p -> links.add(StreamLink(p.elemId, elemId, visibleAt)) }
                 }
-                nodes.add(StreamMarble(nextop.seq, elemId, x, y, nextop.value, nextop.operationID, nextop.type, getMarbleColor(nextop.elementID)))
+                nodes.add(StreamMarble(currentseq, elemId, x, y, op.value, op.operationID, op.type, getMarbleColor(op.elementID, op.direction == "IN"), op.direction))
+                lastopID = op.operationID
             }
         }
+
         println(visualizationObjects.marblesToJson())
         println(visualizationObjects.linksToJson())
         println(visualizationObjects.linesToJson())
         return visualizationObjects
     }
 
-    private fun getMarbleColor(value: Int): String {
+    private fun getMarbleColor(value: Int, isWhite: Boolean): String {
+        if (isWhite) return "#FFFFFF"
         val goldenAngle = 137.508  // idealer Abstand in Grad (laut ChatGPT)
         val hue = ((value.hashCode().absoluteValue * goldenAngle) % 360).toFloat() / 360f
         val saturation = 0.6f
@@ -207,14 +226,15 @@ data class StreamOperationValue (
 )
 
 data class StreamMarble(
-    val id: Int,
+    var id: Int,
     val elemId: String,
     val x: Int,
     val y: Int,
     val label: String,
     val operationID: Int,
     val type: String,
-    val color: String
+    var color: String,
+    var direction: String
 ) {
 
 }
@@ -242,7 +262,7 @@ data class StreamVisualizationInfo (
         links.clear()
         operationLines.clear()
         lastX = 50
-        lastOpId = 0
+        lastOpId = Int.MAX_VALUE
     }
 
     fun marblesToJson(): String {

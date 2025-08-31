@@ -4,7 +4,7 @@ import {
 import {
   HeapArray, HeapArrayElementVar, HeapItem, HeapObject, HeapString, InputBufferInfo, LoadedClass,
   LocalVar, PrimitiveVal, ProcessedTraceState, ReferenceVal, StackFrame,
-  StaticVar, TraceState, Val, Var
+  StaticVar, StreamVizInfo, TraceState, Val, Var
 } from '@/dto/TraceState'
 import { ConsoleLine } from '@Shared/Protocol'
 import _ from 'lodash'
@@ -49,7 +49,7 @@ export class Trace {
       arrows: this.getArrows(stateIndex),
       timeIdxStateIdxMap: this.getTimeIdxStateIdxMap(),
       visitedLines: this.getVisitedLines(),
-      streamVizInfo: this.getStreamVizInfo(stateIndex) //TODO: see getInputBufferInfo
+      streamVizInfo: this.getStreamVizInfo(stateIndex)
     }
   }
 

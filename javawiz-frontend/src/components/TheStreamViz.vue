@@ -3,10 +3,14 @@
     <NavigationBarWithSettings :pane-kind="STREAMVIZ" />
     <div v-if="streamVizInfo.marbles.length > 0" id="stream-viz">
       <div class="controls">
-        <button class="myButton" id="prevBtn" @click="stepBack" >&laquo;</button>
-        <button class="myButton" id="nextBtn" @click="stepForwards">&raquo;</button>
+        <button id="prevBtn" class="myButton" @click="stepBack">
+          &laquo;
+        </button>
+        <button id="nextBtn" class="myButton" @click="stepForwards">
+          &raquo;
+        </button>
       </div>
-      <svg id="stream-viz-svg" width="2000" height="1500"></svg>
+      <svg id="stream-viz-svg" width="2000" height="1500" />
     </div>
     <div v-else>
       <div>
@@ -18,12 +22,10 @@
 
 <script setup lang = 'ts'>
 import {computed, defineComponent, nextTick, ref, watch} from 'vue'
-import sanitizer from '@/helpers/sanitizer'
 import NavigationBarWithSettings from '@/components/NavigationBarWithSettings.vue'
-import {INVIZ, STREAMVIZ} from '@/store/PaneVisibilityStore'
+import {STREAMVIZ} from '@/store/PaneVisibilityStore'
 import { useGeneralStore } from '@/store/GeneralStore'
 import * as d3 from 'd3'
-import * as stream from "node:stream";
 
 defineComponent({
   name: 'TheStreamViz',
@@ -36,25 +38,24 @@ const allLinks = computed(() => streamVizInfo.value.links)
 const operationLines = computed(() => streamVizInfo.value.operationLines)
 const RADIUS = 15;
 const currentStep = ref(0);
-let svg;
-let container;
-let linkGroup;
-let nodeGroup;
+let svg: any;
+let container: d3.Selection<SVGGElement, unknown, any, undefined>;
+let linkGroup: d3.Selection<SVGGElement, unknown, any, undefined>;
+let nodeGroup: d3.Selection<SVGGElement, unknown, any, undefined>;
 let lastNodeX;
 
 // Hilfsfunktion: Für jede ID nur den neuesten Knoten (max step <= currentStep) auswählen
-function getVisibleNodesAtStep(nodes, step) {
+function getVisibleNodesAtStep(nodes: any, step: number) {
   const grouped = d3.group(
-      nodes.filter(n => n.id <= step),
-      d => d.elemId
+    nodes.filter((n: any) => n.id <= step),
+    (d: any) => d.elemId
   );
-  console.log("grouped: ", grouped);
-  return Array.from(grouped, ([id, group]) =>
-      group.reduce((maxNode, current) => current.id > maxNode.id ? current : maxNode)
+  return Array.from(grouped, ([_, group]) =>
+    group.reduce((maxNode: any, current: any) => current.id > maxNode.id ? current : maxNode)
   );
 }
 
-function edgePoint(src, tgt) {
+function edgePoint(src: any, tgt: any) {
   const dx = tgt.x - src.x;
   const dy = tgt.y - src.y;
   const dist = Math.sqrt(dx*dx + dy*dy);
@@ -66,181 +67,142 @@ function edgePoint(src, tgt) {
 
 
 function render() {
-  console.log("Start render()")
-  console.log(svg);
 
   const visibleNodes = getVisibleNodesAtStep(allNodes.value, currentStep.value);
-  console.log(visibleNodes);
   const visibleNodeIds = new Set(visibleNodes.map(n => n.elemId));
-  console.log("visibleNodeIds: ", visibleNodeIds);
-
-  console.log("allLinks: ", allLinks.value);
-  const visibleLinks = allLinks.value.filter(l =>
-      l.visibleAt <= currentStep.value &&
-      visibleNodeIds.has(l.source) &&
-      visibleNodeIds.has(l.target)
+  const visibleLinks = allLinks.value.filter((l: any) =>
+    l.visibleAt <= currentStep.value &&
+    visibleNodeIds.has(l.source) &&
+    visibleNodeIds.has(l.target)
   );
-  console.log("links: ", visibleLinks);
+  const nodes = nodeGroup.selectAll('.node')
+    .data(visibleNodes, (d: any) => d.id)
+    .join(
+      enter => {
+        const g = enter.append('g')
+          .attr('class', 'node')
+          .attr('transform', d => `translate(${d.x},${d.y})`)
+          .style('opacity', 0)
+        g.each(function(d: any) {
+          const group = d3.select(this);
 
-  // const nodes = nodeGroup.selectAll(".node")
-  //     .data(visibleNodes, d => d.id);
-  // console.log(nodes);
-  //
-  // nodes.transition()
-  //     .duration(500)
-  //     .attr("transform", d => `translate(${d.x},${d.y})`);
-  //
-  // nodes.select("circle").transition()
-  //     .duration(500)
-  //     .attr("fill", d => d.color)
-  // ;
-  //
-  // nodes.select("text").transition()
-  //     .duration(500)
-  //     .text(d => d.label);
-  //
-  // const nodesEnter = nodes.enter()
-  //     .append("g")
-  //     .attr("class", "node")
-  //     .attr("transform", d => `translate(${d.x},${d.y})`)
-  //     .style("opacity", 0);
-  //
-  // nodesEnter.append("circle")
-  //     .attr("r", RADIUS)
-  //     .attr("stroke", "#333")
-  //     .attr("stroke-width", 1.5)
-  //     .attr("fill", d => d.color)
-  //     .attr("r", 20);
-  //
-  // nodesEnter.append("text")
-  //     .text(d => d.label)
-  //     .attr("text-anchor", "middle")
-  //     .attr("dominant-baseline", "middle");
-  //
-  // nodesEnter.transition()
-  //     .duration(500)
-  //     .style("opacity", 1);
-  //
-  // nodes.exit()
-  //     .transition()
-  //     .duration(300)
-  //     .style("opacity", 0)
-  //     .remove();
-  console.log("visibleNodes: ", visibleNodes);
-  const nodes = nodeGroup.selectAll(".node")
-      .data(visibleNodes, d => d.id)
-      .join(
-          enter => enter.append("g")
-                        .attr("class", "node")
-                        .attr("transform", d => `translate(${d.x},${d.y})`)
-                        .style("opacity", 0)
-                        .call(g => g.append("circle")
-                                    .attr("r", RADIUS+5)
-                                    .attr("stroke", "#333")
-                                    .attr("stroke-width", 1.5)
-                                    .attr("fill", d => d.color)
-                        )
-                        .call(g => g.append("text")
-                                    .text(d => d.label)
-                                    .attr("text-anchor", "middle")
-                                    .attr("dominant-baseline", "middle")
-                        ),
+          if (d.direction === 'IN') {
+            const size = RADIUS + 5;
+
+            group.append('circle')
+              .attr('r', size)
+              .attr('stroke', '#303030')
+              .attr('stroke-width', 2)
+              .attr('fill', 'white');
+
+            const crossSize = size * 0.7;
+            group.append('line')
+              .attr('x1', -crossSize)
+              .attr('y1', -crossSize)
+              .attr('x2', crossSize)
+              .attr('y2', crossSize)
+              .attr('stroke', '#303030')
+              .attr('stroke-width', 2)
+              .attr('stroke-linecap', 'round');
+
+            group.append('line')
+              .attr('x1', -crossSize)
+              .attr('y1', crossSize)
+              .attr('x2', crossSize)
+              .attr('y2', -crossSize)
+              .attr('stroke', '#303030')
+              .attr('stroke-width', 2)
+              .attr('stroke-linecap', 'round');
+          } else {
+            group.append('circle')
+              .attr('r', RADIUS + 5)
+              .attr('stroke', '#333')
+              .attr('stroke-width', 1.5)
+              .attr('fill', d.color);
+            g.append('text')
+              .text(d => d.label)
+              .attr('text-anchor', 'middle')
+              .attr('dominant-baseline', 'middle');
+          }
+        });
+
+        return g;
+      },
       update => update,
       exit => exit.transition()
-                  .duration(300)
-                  .style("opacity", 0)
-                  .remove()
-  );
+        .duration(300)
+        .style('opacity', 0)
+        .remove()
+    );
   nodes.transition()
-      .duration(500)
-      .attr("transform", d => `translate(${d.x},${d.y})`)
-      .style("opacity", 1);
+    .duration(500)
+    .attr('transform', d => `translate(${d.x},${d.y})`)
+    .style('opacity', 1);
 
-  nodes.select("circle").transition()
-      .duration(500)
-      .attr("fill", d => d.color);
+  nodes.select('circle').transition()
+    .duration(500)
+    .attr('fill', d => d.color);
 
-  nodes.select("text").text(d => d.label);
+  nodes.select('text').text(d => d.direction === 'IN' ? '' : d.label);
 
-  const links = linkGroup.selectAll(".link")
-      .data(visibleLinks, d => d.source + "-" + d.target);
+  const nodeLinksMap = new Map(visibleNodes.map(node => [node.elemId, node]));
+  const links = linkGroup.selectAll('.link')
+    .data(visibleLinks, (d: any) => d.source + '-' + d.target)
+    .join(
+      enter => enter.append('line')
+        .attr('class', 'link')
+        .style('opacity', 0)
+        .attr('x1', (d: any) => {
+          const src = nodeLinksMap.get(d.source);
+          return src ? src.x : 0;
+        })
+        .attr('y1', (d: any) => {
+          const src = nodeLinksMap.get(d.source);
+          return src ? src.y : 0;
+        })
+        .attr('x2', (d: any) => { // Start the line collapsed at the source
+          const src = nodeLinksMap.get(d.source);
+          return src ? src.x : 0;
+        })
+        .attr('y2', (d: any) => { // Start the line collapsed at the source
+          const src = nodeLinksMap.get(d.source);
+          return src ? src.y : 0;
+        }),
+      update => update,
+      exit => exit
+        .transition()
+        .duration(300) // Use a slightly faster exit duration
+        .style('opacity', 0)
+        .remove()
+    );
 
   links.transition()
-      .duration(500)
-      .attr("x1", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(src, tgt).x;  // Rand am Source Richtung Target
-      })
-      .attr("y1", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(src, tgt).y;
-      })
-      .attr("x2", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(tgt, src).x;  // Rand am Target Richtung Source
-      })
-      .attr("y2", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(tgt, src).y;
-      })
-      .style("opacity", 1);
-
-  const linksEnter = links.enter()
-      .append("line")
-      .attr("class", "link")
-      .attr("x1", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        return src ? src.x : 0;
-      })
-      .attr("y1", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        return src ? src.y : 0;
-      })
-      .attr("x2", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        return src ? src.x : 0;
-      })
-      .attr("y2", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        return src ? src.y : 0;
-      })
-      .style("opacity", 0)
-      .transition()
-      .duration(500)
-      .attr("x1", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(src, tgt).x;
-      })
-      .attr("y1", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(src, tgt).y;
-      })
-      .attr("x2", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(tgt, src).x;
-      })
-      .attr("y2", d => {
-        const src = visibleNodes.find(n => n.elemId === d.source);
-        const tgt = visibleNodes.find(n => n.elemId === d.target);
-        return edgePoint(tgt, src).y;
-      })
-      .style("opacity", 1);
-
-  links.exit()
-      .transition()
-      .style("opacity", 0)
-      .remove();
+    .duration(500)
+    .style('opacity', 1) // Fades in new links
+    .attr('x1', (d: any) => {
+      const src = nodeLinksMap.get(d.source);
+      const tgt = nodeLinksMap.get(d.target);
+      return edgePoint(src, tgt).x;
+    })
+    .attr('y1', (d: any) => {
+      const src = nodeLinksMap.get(d.source);
+      const tgt = nodeLinksMap.get(d.target);
+      return edgePoint(src, tgt).y;
+    })
+    .attr('x2', (d: any) => {
+      const src = nodeLinksMap.get(d.source);
+      const tgt = nodeLinksMap.get(d.target);
+      return edgePoint(tgt, src).x;
+    })
+    .attr('y2', (d: any) => {
+      const src = nodeLinksMap.get(d.source);
+      const tgt = nodeLinksMap.get(d.target);
+      return edgePoint(tgt, src).y;
+    });
 }
 
 function stepForwards() {
-  if (currentStep.value < allNodes.value.reduce((max, n) => Math.max(max, n.id), 0)) {
+  if (currentStep.value < allNodes.value.reduce((max: any, n: any) => Math.max(max, n.id), 0)) {
     currentStep.value++;
   }
 }
@@ -251,63 +213,60 @@ function stepBack() {
   }
 }
 
-function zoomed(event) {
-  container.attr("transform", event.transform);
+function zoomed(event: any) {
+  container.attr('transform', event.transform);
 }
 
 watch(streamVizInfo, () => {
   if (streamVizInfo.value.marbles.length > 0) {
     nextTick(() => {
-      svg = d3.select("#stream-viz-svg");
-      svg.selectAll("*").remove();
+      svg = d3.select('#stream-viz-svg');
+      svg.selectAll('*').remove();
 
-      container = svg.append("g").attr("class", "container");
+      container = svg.append('g').attr('class', 'container');
 
-      lastNodeX = Math.max(...allNodes.value.map(n => n.x));
-      console.log("lastNodeX: ",lastNodeX);
-      console.log(allNodes.value.map(n => n.x));
-      console.log(allNodes.value)
-      svg.append("defs").append("marker")
-          .attr("id", "arrow")
-          .attr("viewBox", "0 -5 10 10")
-          .attr("refX", 13)
-          .attr("refY", 0)
-          .attr("markerWidth", 6)
-          .attr("markerHeight", 6)
-          .attr("orient", "auto")
-          .append("path")
-          .attr("d", "M0,-5L10,0L0,5")
-          .attr("fill", "#999");
+      lastNodeX = Math.max(...allNodes.value.map((n: any) => n.x));
+      svg.append('defs').append('marker')
+        .attr('id', 'arrow')
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 13)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', '#999');
 
-      container.selectAll(".opline")
-          .data(Object.values({ ...operationLines.value }))
-          .join("line")
-          .attr("class", "opline")
-          .attr("x1", 0)
-          .attr("y1", d => d.y)
-          .attr("x2", lastNodeX + 50)
-          .attr("y2", d => d.y)
-          .attr("stroke", "#999")
-          .attr("stroke-width", 1.5)
-          .attr("stroke-dasharray", "8 4");
+      container.selectAll('.opline')
+        .data(Object.values({ ...operationLines.value }))
+        .join('line')
+        .attr('class', 'opline')
+        .attr('x1', 0)
+        .attr('y1', (d: any) => d.y)
+        .attr('x2', lastNodeX + 110)
+        .attr('y2', (d: any) => d.y)
+        .attr('stroke', '#999')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '8 4');
 
-      container.selectAll(".oplabel")
-          .data(Object.values({ ...operationLines.value }))
-          .join("text")
-          .attr("x", lastNodeX + 40)
-          .attr("y", d => d.y - 5)
-          .attr("text-anchor", "end")
-          .text(d => d.type)
-          .attr("fill", "#888")
-          .attr("font-size", "11px")
-          .attr("style", "font-size: 1.5rem; user-select: none;");
+      container.selectAll('.oplabel')
+        .data(Object.values({ ...operationLines.value }))
+        .join('text')
+        .attr('x', lastNodeX + 100)
+        .attr('y', (d: any) => d.y - 5)
+        .attr('text-anchor', 'end')
+        .text((d: any) => d.type)
+        .attr('fill', '#888')
+        .attr('font-size', '11px')
+        .attr('style', 'font-size: 1.5rem; user-select: none;');
 
-      linkGroup = container.append("g").attr("class", "links");
-      nodeGroup = container.append("g").attr("class", "nodes");
+      linkGroup = container.append('g').attr('class', 'links');
+      nodeGroup = container.append('g').attr('class', 'nodes');
 
       const zoom = d3.zoom()
-          .scaleExtent([0.1, 10])
-          .on("zoom", zoomed);
+        .scaleExtent([0.1, 10])
+        .on('zoom', zoomed);
       svg.call(zoom);
 
       render();
