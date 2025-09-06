@@ -34,9 +34,9 @@
         :icon="sequencediagram"
         @action="() => { emit('selected', SEQUENCEDIAGRAM) }" />
       <IconWithTooltip
-          :tooltip="{ text: streamVizText, arrow: 'left', placement: 'below' }"
-          :icon="sequencediagram"
-          @action="() => { emit('selected', STREAMVIZ) }" />
+        :tooltip="{ text: streamVizText, arrow: 'left', placement: 'below' }"
+        :icon="marblediagram"
+        @action="() => { emit('selected', STREAMVIZ) }" />
     </div>
   </div>
 </template>
@@ -52,6 +52,7 @@ import list from '../../assets/icons/hiding/list.svg'
 import tree_ from '../../assets/icons/hiding/tree.svg'
 import console_ from '../../assets/icons/hiding/console.svg'
 import sequencediagram from '../../assets/icons/hiding/sequencediagram.svg'
+import marblediagram from '../../assets/icons/hiding/marblediagram.svg'
 
 
 defineComponent({
