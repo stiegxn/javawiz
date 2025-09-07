@@ -230,7 +230,6 @@ class JDIVirtualMachine(
             conditionTracer.collectConditionValuesForStepEvent(event.thread().frameCount()),
             // create copy of conditions so that we serialize the current state of evaluated
             arrayAccessTracer.collectAccessValuesForStepEvent(event.thread().frameCount()),
-            //streamOperationTracer.collectAndTransformStreamOperationValues(),
             streamOperationTracer.visualizationObjects,
             streamToString(debuggeeOutput),
             streamToString(debuggeeError),

@@ -152,16 +152,12 @@ class StreamOperationTracer {
         var currentseq = 0
         var seqOffset = 0
 
+        val sortedOperations = mutableSetOf<Int>()
+
         for (op in operations) {
             if (!lines.containsKey(op.operationID)) {
                 lines[op.operationID] = StreamOperationLine(op.type, lines.size * 100 + 50)
             }
-//            currentseq = if (op.direction == "IN" && op.type == "filter") {
-//                seqOffset++
-//                currentseq + seqOffset
-//            } else {
-//                op.seq + seqOffset
-//            }
             if (op.seq > 0 || (op.direction == "IN" && op.type == "filter")) {
                 if (op.type == "filter") {
                     if (op.direction == "OUT") {
@@ -175,6 +171,10 @@ class StreamOperationTracer {
                     }
                 } else {
                     currentseq = op.seq + seqOffset
+                }
+                if (op.type == "sorted" && !sortedOperations.contains(op.operationID)) {
+                    visualizationObjects.lastX += 100
+                    sortedOperations.add(op.operationID)
                 }
                 val x = if (op.operationID < lastopID) {
                     visualizationObjects.lastX

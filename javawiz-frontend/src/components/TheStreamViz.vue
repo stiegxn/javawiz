@@ -287,7 +287,7 @@ watch(currentStep, () => {
   marker-end: url(#arrow);
 }
 .node circle {
-  stroke: #333;
+  //stroke: #333;
   stroke-width: 1.5px;
   padding: 5px;
 }
