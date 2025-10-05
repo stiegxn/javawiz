@@ -293,21 +293,39 @@ class JDIVirtualMachine(
 
             "traceStream" -> {
                 val direction = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("direction")!!) as StringReference).value()
-                val elem = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!) as StringReference).value()
+                val elemUntyped = javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!)
+                var valuetype = elemUntyped.type().name()
+                val value = when (elemUntyped) {
+                    is StringReference -> elemUntyped.value()
+                    is IntegerValue -> elemUntyped.value()
+                    is DoubleValue -> elemUntyped.value()
+                    is FloatValue -> elemUntyped.value()
+                    is LongValue -> elemUntyped.value()
+                    is BooleanValue -> elemUntyped.value()
+                    is CharValue -> elemUntyped.value()
+                    is ByteValue -> elemUntyped.value()
+                    is ShortValue -> elemUntyped.value()
+                    is ObjectReference -> {
+                        valuetype = valuetype.drop(valuetype.lastIndexOf('$') + 1)
+                        elemUntyped.uniqueID()
+                    }
+                    else -> error("unknown stream element type: ${elemUntyped.type().name()}")
+                }
                 val operationName = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("name")!!) as StringReference).value()
                 val operationId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("id")!!) as IntegerValue).value()
                 val streamId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("streamId")!!) as IntegerValue).value()
                 when (direction) {
-                    "START" -> streamOperationTracer.traceStartStream(operationName, operationId, elem, streamId)
-                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, elem, streamId)
-                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, elem, streamId)
+                    "START" -> streamOperationTracer.traceStartStream(operationName, operationId, value, valuetype, streamId)
+                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, value, valuetype, streamId)
+                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, value, valuetype, streamId)
                     "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId)
-                    else -> streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf(0), elem)
+                    else -> error("unknown direction for stream element")//streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf
+                // (0), value)
                 }
 
                 // For Testing only, delete later
                 println("Test value")
-                println("Stream operation: $direction, $elem, $operationName, $operationId")
+                println("Stream operation: $direction, $value, ${elemUntyped.type()}, $operationName, $operationId")
                 println(streamOperationTracer.sequenceCounter)
                 println(streamOperationTracer.lastTraceValue)
                 println(streamOperationTracer.streamtrace)

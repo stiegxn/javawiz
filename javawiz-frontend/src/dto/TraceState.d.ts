@@ -210,6 +210,7 @@ interface StreamMarble {
   readonly elemId: string,
   readonly x: number,
   readonly y: number,
+  readonly valuetype: string,
   readonly label: string,
   readonly operationID: number,
   readonly type: string,

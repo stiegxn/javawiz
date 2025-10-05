@@ -1,16 +1,20 @@
 <template>
   <div v-if="streamVizInfo" id="io-viz">
-    <NavigationBarWithSettings :pane-kind="STREAMVIZ" />
-    <div v-if="streamVizInfo.marbles.length > 0" id="stream-viz">
+    <NavigationBarWithSettings
+        :zoom-reset="zoomAndCenter"
+        :pane-kind="STREAMVIZ"
+    />
+    <div v-if="streamVizInfo.marbles.length > 0" id="stream-viz" style="height: 100%;">
       <div class="controls">
         <button id="prevBtn" class="myButton" @click="stepBack">
           &laquo;
         </button>
+        <div> {{ currentStep }}<span style="font-weight: bolder; font-size: 1.2rem;">/{{ allNodes.length }}</span></div>
         <button id="nextBtn" class="myButton" @click="stepForwards">
           &raquo;
         </button>
       </div>
-      <svg id="stream-viz-svg" width="2000" height="1500" />
+      <svg id="stream-viz-svg" width="100%" height="100%"/>
     </div>
     <div v-else>
       <div>
@@ -26,6 +30,7 @@ import NavigationBarWithSettings from '@/components/NavigationBarWithSettings.vu
 import {STREAMVIZ} from '@/store/PaneVisibilityStore'
 import { useGeneralStore } from '@/store/GeneralStore'
 import * as d3 from 'd3'
+import {steps} from "colorjs.io/fn";
 
 defineComponent({
   name: 'TheStreamViz',
@@ -36,12 +41,16 @@ const streamVizInfo = computed(() => generalStore.currentTraceData?.streamVizInf
 const allNodes = computed(() => streamVizInfo.value.marbles)
 const allLinks = computed(() => streamVizInfo.value.links)
 const operationLines = computed(() => streamVizInfo.value.operationLines)
+const heap = computed(() => generalStore.currentTraceData?.processedTraceState?.heapBeforeExecution)
 const RADIUS = 15;
 const currentStep = ref(0);
 let svg: any;
 let container: d3.Selection<SVGGElement, unknown, any, undefined>;
 let linkGroup: d3.Selection<SVGGElement, unknown, any, undefined>;
 let nodeGroup: d3.Selection<SVGGElement, unknown, any, undefined>;
+let zoom = d3.zoom()
+    .scaleExtent([0.1, 10])
+    .on('zoom', zoomed);
 let lastNodeX;
 
 // Hilfsfunktion: Für jede ID nur den neuesten Knoten (max step <= currentStep) auswählen
@@ -120,7 +129,13 @@ function render() {
               .attr('stroke-width', 1.5)
               .attr('fill', d.color);
             g.append('text')
-              .text(d => d.label)
+              .text(d => {
+                if(d.valuetype === "Person") {
+                  return "Person: " + d.label
+                } else {
+                  return d.label
+                }
+              })
               .attr('text-anchor', 'middle')
               .attr('dominant-baseline', 'middle');
           }
@@ -143,7 +158,25 @@ function render() {
     .duration(500)
     .attr('fill', d => d.color);
 
-  nodes.select('text').text(d => d.direction === 'IN' ? '' : d.label);
+  nodes.select('text')
+       .text(d => {
+         if (d.direction === 'IN') return  '';
+         if (d.valuetype === "Person") {
+           const personObj = heap.value?.find(obj => obj.id.toString() === d.label);
+           if (!personObj) return "Person: " + d.label;
+
+           const refId = personObj.fields?.[1]?.value?.reference;
+           const refObj = heap.value?.find(obj => obj.id === refId);
+           let t = refObj?.string || d.label;
+
+           if (t.length > 10) {
+             t = t.substring(0, 10) + "...";
+           }
+
+           return t;
+         }
+         return d.label;
+       });
 
   const nodeLinksMap = new Map(visibleNodes.map(node => [node.elemId, node]));
   const links = linkGroup.selectAll('.link')
@@ -217,11 +250,45 @@ function zoomed(event: any) {
   container.attr('transform', event.transform);
 }
 
-watch(streamVizInfo, () => {
-  if (streamVizInfo.value.marbles.length > 0) {
+function zoomAndCenter() {
+  if (!svg || !container) return;
+
+  const { width: svgWidth, height: svgHeight } = svg.node().getBoundingClientRect();
+
+  const bounds = container.node().getBBox();
+  const fullWidth = bounds.width;
+  const fullHeight = bounds.height;
+
+  const midX = bounds.x + fullWidth / 2;
+  const midY = bounds.y + fullHeight / 2;
+
+  if (fullWidth === 0 || fullHeight === 0) return; // Avoid division by zero
+
+  const scale = Math.min(svgWidth / fullWidth, svgHeight / fullHeight) * 0.9; // Slightly smaller to fit
+
+  const translateX = svgWidth / 2 - scale * midX;
+  const translateY = svgHeight / 2 - scale * midY;
+
+  const transform = d3.zoomIdentity
+      .translate(translateX, translateY)
+      .scale(scale);
+
+  svg.call(zoom.transform, transform);
+}
+
+watch(streamVizInfo, (newVal, oldVal) => {
+  if (streamVizInfo.value.marbles.length > 0 && oldVal && JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+    currentStep.value = 0;
     nextTick(() => {
       svg = d3.select('#stream-viz-svg');
       svg.selectAll('*').remove();
+
+      svg.append('rect')
+          .attr('class', 'zoom-bg')
+          .attr('width', '100%')
+          .attr('height', '100%')
+          .attr('fill', 'transparent')
+          .style('pointer-events', 'all');
 
       container = svg.append('g').attr('class', 'container');
 
@@ -264,12 +331,9 @@ watch(streamVizInfo, () => {
       linkGroup = container.append('g').attr('class', 'links');
       nodeGroup = container.append('g').attr('class', 'nodes');
 
-      const zoom = d3.zoom()
-        .scaleExtent([0.1, 10])
-        .on('zoom', zoomed);
       svg.call(zoom);
-
       render();
+      zoomAndCenter();
     });
   }
 });
@@ -296,15 +360,24 @@ text {
   user-select: none;
 }
 .controls {
-  margin: 20px;
+  margin-top: 20px;
   display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
 }
 .myButton {
-  font-size: 2rem;
-  border-radius: 50px;
-  background-color: lightgrey;
-  margin: 10px;
-  padding: 5px 25px 5px 25px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border-radius: 15px;
+  border: 2px solid black;
+  background-color: #efefef;
+  padding: 5px 15px 5px 15px;
   cursor: pointer;
+}
+
+.myButton:hover {
+  background-color: grey;
+  box-shadow: 0px 0px 15px grey;
 }
 </style>
