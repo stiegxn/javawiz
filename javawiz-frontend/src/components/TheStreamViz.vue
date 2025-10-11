@@ -30,7 +30,6 @@ import NavigationBarWithSettings from '@/components/NavigationBarWithSettings.vu
 import {STREAMVIZ} from '@/store/PaneVisibilityStore'
 import { useGeneralStore } from '@/store/GeneralStore'
 import * as d3 from 'd3'
-import {steps} from "colorjs.io/fn";
 
 defineComponent({
   name: 'TheStreamViz',
@@ -123,21 +122,135 @@ function render() {
               .attr('stroke-width', 2)
               .attr('stroke-linecap', 'round');
           } else {
-            group.append('circle')
-              .attr('r', RADIUS + 5)
-              .attr('stroke', '#333')
-              .attr('stroke-width', 1.5)
-              .attr('fill', d.color);
-            g.append('text')
-              .text(d => {
-                if(d.valuetype === "Person") {
-                  return "Person: " + d.label
+            if (d.valuetype === "java.lang.String") {
+              group.append('rect')
+                .attr('x', -RADIUS * 3)
+                .attr('y', -RADIUS - 5)
+                .attr('width', (RADIUS) * 10)
+                .attr('height', (RADIUS + 5) * 2)
+                .attr('rx', 5)
+                .attr('ry', 5)
+                .attr('stroke', '#333')
+                .attr('stroke-width', 1.5)
+                .attr('fill', d.color);
+
+              group.append('text')
+                  .text(d => {
+                    const str = d.label;
+                    console.log("str.length: " + str.length);
+                    if (str.length > 15) {
+                      return `"${str.substring(0, 15)}..."`;
+                    } else {
+                      return `"${str}"`;
+                    }
+                  })
+                  .attr('text-anchor', 'middle')
+                  .attr('dominant-baseline', 'middle')
+                  .attr('style', 'font-size: 0.8rem;')
+                  .attr('x', RADIUS * 2);
+            } else if (["int", "long", "double", "float", "boolean", "char", "byte", "short"].includes(d.valuetype)) {
+              group.append('circle')
+                .attr('r', RADIUS + 5)
+                .attr('stroke', '#333')
+                .attr('stroke-width', 1.5)
+                .attr('fill', d.color);
+
+              group.append('text')
+                  .text(d => d.label)
+                  .attr('text-anchor', 'middle')
+                  .attr('dominant-baseline', 'middle');
+            } else {
+              const object = heap.value?.find(obj => obj.id.toString() === d.label);
+              var fields = object?.fields || [];
+              var result = fields;
+              if (fields.length > 3) {
+                // search for field with name "name", "Name", "title" or "Title"
+                const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
+                if (nameField) {
+                  result = [nameField];
+                  fields = fields.slice(0, 2);
+                  fields = fields.filter(f => f !== nameField);
+                  result.push(fields[0]);
                 } else {
-                  return d.label
+                  result = fields.slice(0, 2);
                 }
-              })
-              .attr('text-anchor', 'middle')
-              .attr('dominant-baseline', 'middle');
+                result.push({ name: '...', value: { type: '...', reference: '...' } });
+              }
+
+              group.append('rect')
+                .attr('x', -RADIUS * 3)
+                .attr('y', -RADIUS - 5)
+                .attr('width', (RADIUS) * 10)
+                .attr('height', (RADIUS) * 2)
+                .attr('rx', 2)
+                .attr('ry', 2)
+                .attr('stroke', '#333')
+                .attr('stroke-width', 1.5)
+                .attr('fill', d.color);
+
+              g.append('text')
+                  .text(d => d.valuetype)
+                  .attr('text-anchor', 'middle')
+                  .attr('dominant-baseline', 'middle')
+                  .attr('x', RADIUS * 2);
+
+              for (let i = 0; i < result.length; i++) {
+                group.append('rect')
+                  .attr('x', -RADIUS * 3)
+                  .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
+                  .attr('width', (RADIUS) * 5)
+                  .attr('height', (RADIUS + 5) + 10)
+                  .attr('rx', 2)
+                  .attr('ry', 2)
+                  .attr('stroke', '#333')
+                  .attr('stroke-width', 1.5)
+                    // set color based on d.color but with 20% opacity
+                  .attr('fill', d3.color(d.color)?.copy({ opacity: 0.2 })?.toString() || d.color);
+
+                group.append('text')
+                  .text(d => result[i].name)
+                  .attr('text-anchor', 'start')
+                  .attr('dominant-baseline', 'middle')
+                  .attr('y', 30 * i + 25)
+                  .attr('x', -RADIUS * 3 + 5)
+                  .attr('style', 'font-size: 0.8rem;');
+
+                group.append('rect')
+                    .attr('x', RADIUS * 2)
+                    .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
+                    .attr('width', (RADIUS) * 5)
+                    .attr('height', (RADIUS + 5) + 10)
+                    .attr('rx', 2)
+                    .attr('ry', 2)
+                    .attr('stroke', '#333')
+                    .attr('stroke-width', 1.5)
+                    // set color based on d.color but with 20% opacity
+                    .attr('fill', d3.color(d.color)?.copy({ opacity: 0.2 })?.toString() || d.color);
+
+                group.append('text')
+                  .text(d => {
+                    const object = result[i].value;
+                    console.log(object);
+                    if (object.reference) {
+                      let t = heap.value?.find(obj => obj.id === object.reference)?.string || object.reference;
+                      if (t.length > 10) {
+                        t = t.substring(0, 10) + "...";
+                      }
+
+                      return t;
+                    } else if (object.primitiveValue) {
+                      return object.primitiveValue;
+                    }
+                    return '';
+                  })
+                  .attr('text-anchor', 'start')
+                  .attr('dominant-baseline', 'middle')
+                  .attr('y', 30 * i + 25)
+                  .attr('x', -RADIUS * 1.5 * -2 - 5)
+                  .attr('style', 'font-size: 0.8rem;');
+              }
+
+            }
           }
         });
 
@@ -158,25 +271,34 @@ function render() {
     .duration(500)
     .attr('fill', d => d.color);
 
-  nodes.select('text')
-       .text(d => {
-         if (d.direction === 'IN') return  '';
-         if (d.valuetype === "Person") {
-           const personObj = heap.value?.find(obj => obj.id.toString() === d.label);
-           if (!personObj) return "Person: " + d.label;
-
-           const refId = personObj.fields?.[1]?.value?.reference;
-           const refObj = heap.value?.find(obj => obj.id === refId);
-           let t = refObj?.string || d.label;
-
-           if (t.length > 10) {
-             t = t.substring(0, 10) + "...";
-           }
-
-           return t;
-         }
-         return d.label;
-       });
+  // nodes.select('text')
+  //      .text(d => {
+  //        if (d.direction === 'IN') return  '';
+  //        if (["int", "long", "double", "float", "boolean", "char", "byte", "short"].includes(d.valuetype)) {
+  //          return d.label;
+  //        } else if (d.valuetype === "java.lang.String") {
+  //          const str = d.label;
+  //          console.log("str.length: " + str.length);
+  //          if (str.length > 10) {
+  //            return `"${str.substring(0, 10)}..."`;
+  //          } else {
+  //            return `"${str}"`;
+  //          }
+  //        } else {
+  //          const object = heap.value?.find(obj => obj.id.toString() === d.label);
+  //
+  //          const refId = object.fields?.[1]?.value?.reference;
+  //          const refObj = heap.value?.find(obj => obj.id === refId);
+  //          let t = refObj?.string || d.label;
+  //
+  //          if (t.length > 10) {
+  //            t = t.substring(0, 10) + "...";
+  //          }
+  //
+  //          return t;
+  //        }
+  //      })
+  //     .attr('style', d => d.valuetype === "java.lang.String" ? 'font-size: 0.8rem;' : '');
 
   const nodeLinksMap = new Map(visibleNodes.map(node => [node.elemId, node]));
   const links = linkGroup.selectAll('.link')
@@ -311,7 +433,7 @@ watch(streamVizInfo, (newVal, oldVal) => {
         .attr('class', 'opline')
         .attr('x1', 0)
         .attr('y1', (d: any) => d.y)
-        .attr('x2', lastNodeX + 110)
+        .attr('x2', lastNodeX + 210)
         .attr('y2', (d: any) => d.y)
         .attr('stroke', '#999')
         .attr('stroke-width', 1.5)
@@ -320,7 +442,7 @@ watch(streamVizInfo, (newVal, oldVal) => {
       container.selectAll('.oplabel')
         .data(Object.values({ ...operationLines.value }))
         .join('text')
-        .attr('x', lastNodeX + 100)
+        .attr('x', lastNodeX + 200)
         .attr('y', (d: any) => d.y - 5)
         .attr('text-anchor', 'end')
         .text((d: any) => d.type)

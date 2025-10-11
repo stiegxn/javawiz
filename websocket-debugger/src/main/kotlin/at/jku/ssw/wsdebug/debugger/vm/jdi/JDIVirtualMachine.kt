@@ -297,6 +297,7 @@ class JDIVirtualMachine(
                 var valuetype = elemUntyped.type().name()
                 val value = when (elemUntyped) {
                     is StringReference -> elemUntyped.value()
+                    // check for java.lang.Integer also
                     is IntegerValue -> elemUntyped.value()
                     is DoubleValue -> elemUntyped.value()
                     is FloatValue -> elemUntyped.value()
@@ -306,8 +307,39 @@ class JDIVirtualMachine(
                     is ByteValue -> elemUntyped.value()
                     is ShortValue -> elemUntyped.value()
                     is ObjectReference -> {
-                        valuetype = valuetype.drop(valuetype.lastIndexOf('$') + 1)
-                        elemUntyped.uniqueID()
+                        // Prüfe auf Wrapper-Klassen
+                        val primitiveTypeName = when (valuetype) {
+                            "java.lang.Integer" -> "int"
+                            "java.lang.Double" -> "double"
+                            "java.lang.Float" -> "float"
+                            "java.lang.Long" -> "long"
+                            "java.lang.Boolean" -> "boolean"
+                            "java.lang.Character" -> "char"
+                            "java.lang.Byte" -> "byte"
+                            "java.lang.Short" -> "short"
+                            else -> null
+                        }
+
+                        if (primitiveTypeName != null) {
+                            valuetype = primitiveTypeName
+                            val valueField = elemUntyped.referenceType().fieldByName("value")
+                            val fieldValue = elemUntyped.getValue(valueField!!)
+                            when (fieldValue) {
+                                is IntegerValue -> fieldValue.value()
+                                is DoubleValue -> fieldValue.value()
+                                is FloatValue -> fieldValue.value()
+                                is LongValue -> fieldValue.value()
+                                is BooleanValue -> fieldValue.value()
+                                is CharValue -> fieldValue.value()
+                                is ByteValue -> fieldValue.value()
+                                is ShortValue -> fieldValue.value()
+                                else -> error("unknown value type for wrapper $valuetype: ${fieldValue?.type()?.name()}")
+                            }
+                        } else {
+                            // Kein Wrapper -> normales Objekt
+                            valuetype = valuetype.drop(valuetype.lastIndexOf('$') + 1)
+                            elemUntyped.uniqueID()
+                        }
                     }
                     else -> error("unknown stream element type: ${elemUntyped.type().name()}")
                 }

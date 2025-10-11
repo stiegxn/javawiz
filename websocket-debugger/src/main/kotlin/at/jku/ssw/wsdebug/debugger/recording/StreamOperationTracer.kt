@@ -1,6 +1,5 @@
 package at.jku.ssw.wsdebug.debugger.recording
 
-import com.sun.jdi.Type
 import java.awt.Color
 import kotlin.math.absoluteValue
 
@@ -127,7 +126,7 @@ class StreamOperationTracer {
                         else -> 1
                     }
                 })
-                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, null, count)
+                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "int", count)
             }
 //            "max" -> {
 //                val lastInOp = lastInOps[operationID]
@@ -168,9 +167,18 @@ class StreamOperationTracer {
 
         val sortedOperations = mutableSetOf<Int>()
 
+        var lastValueType = ""
         for (op in operations) {
             if (!lines.containsKey(op.operationID)) {
-                lines[op.operationID] = StreamOperationLine(op.type, lines.size * 100 + 50)
+                var yValue = (lines.values.maxByOrNull { it.y }?.y ?: -100) + 100
+                println("YValue for operation ${op.operationID} (${op.type}): $yValue")
+                if (yValue != 0) {
+                    if (!arrayOf("int", "long", "double", "float", "boolean", "char", "byte", "short", "java.lang.String").contains(lastValueType)) {
+                        yValue += 100
+                    }
+                }
+                println("New YValue for operation ${op.operationID} (${op.type}): $yValue")
+                lines[op.operationID] = StreamOperationLine(op.type, yValue, op.valuetype)
             }
             if (op.seq > 0 || (op.direction == "IN" && op.type == "filter")) {
                 if (op.type == "filter") {
@@ -187,13 +195,21 @@ class StreamOperationTracer {
                     currentseq = op.seq + seqOffset
                 }
                 if (op.type == "sorted" && !sortedOperations.contains(op.operationID)) {
-                    visualizationObjects.lastX += 100
+                    visualizationObjects.lastX += if (!arrayOf("int", "long", "double", "float", "boolean").contains(lines[op.operationID]!!.valuetype)) {
+                        200
+                    } else {
+                        100
+                    }
                     sortedOperations.add(op.operationID)
                 }
                 val x = if (op.operationID < lastopID) {
                     visualizationObjects.lastX
                 } else {
-                    visualizationObjects.lastX += 100
+                    if (!arrayOf("int", "long", "double", "float", "boolean").contains(lines[op.operationID]!!.valuetype)) {
+                        visualizationObjects.lastX += 200
+                    } else {
+                        visualizationObjects.lastX += 100
+                    }
                     visualizationObjects.lastX
                 }
                 visualizationObjects.lastOpId = op.operationID
@@ -209,6 +225,7 @@ class StreamOperationTracer {
                 nodes.add(StreamMarble(currentseq, elemId, x, y, op.valuetype, op.value.toString(), op.operationID, op.type, getMarbleColor(op.elementID, op.direction == "IN"), op
                     .direction))
                 lastopID = op.operationID
+                lastValueType = op.valuetype ?: lastValueType
             }
         }
 
@@ -264,7 +281,8 @@ data class StreamLink (
 
 data class StreamOperationLine (
     val type: String,
-    val y: Int
+    val y: Int,
+    val valuetype: String?
 )
 
 data class StreamVisualizationInfo (
