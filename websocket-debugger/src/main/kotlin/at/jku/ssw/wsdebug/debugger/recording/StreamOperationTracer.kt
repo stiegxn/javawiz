@@ -168,7 +168,11 @@ class StreamOperationTracer {
         val sortedOperations = mutableSetOf<Int>()
 
         var lastValueType = ""
+        var containsBigType = false
         for (op in operations) {
+            if (!containsBigType && !arrayOf("int", "long", "double", "float", "boolean", "char", "byte", "short").contains(op.valuetype)) {
+                containsBigType = true
+            }
             if (!lines.containsKey(op.operationID)) {
                 var yValue = (lines.values.maxByOrNull { it.y }?.y ?: -100) + 100
                 println("YValue for operation ${op.operationID} (${op.type}): $yValue")
@@ -205,7 +209,8 @@ class StreamOperationTracer {
                 val x = if (op.operationID < lastopID) {
                     visualizationObjects.lastX
                 } else {
-                    if (!arrayOf("int", "long", "double", "float", "boolean").contains(lines[op.operationID]!!.valuetype)) {
+                    if (containsBigType) {
+//                    if (!arrayOf("int", "long", "double", "float", "boolean").contains(lines[op.operationID]!!.valuetype)) {
                         visualizationObjects.lastX += 200
                     } else {
                         visualizationObjects.lastX += 100

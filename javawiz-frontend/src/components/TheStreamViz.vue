@@ -9,10 +9,43 @@
         <button id="prevBtn" class="myButton" @click="stepBack">
           &laquo;
         </button>
-        <div> {{ currentStep }}<span style="font-weight: bolder; font-size: 1.2rem;">/{{ allNodes.length }}</span></div>
+        <div @dblclick="editMode = true" style="user-select: none; cursor: pointer;">
+          <span v-if="!editMode">{{ currentStep }}</span>
+          <span v-else>
+            <input
+                ref="stepInput"
+                class="inputField"
+                type="number"
+                v-model.number="inputStep"
+                min="0"
+                :max="allNodes.length"
+                @keyup.esc="cancelEdit"
+                @keyup.enter="applyStep"
+                @blur="applyStep"
+                autofocus
+            />
+          </span>
+          <span style="font-weight: bolder; font-size: 1.2rem;">/{{ allNodes.length }}</span>
+        </div>
         <button id="nextBtn" class="myButton" @click="stepForwards">
           &raquo;
         </button>
+        <div v-if="!isPlaying" class="playControls">
+          <button id="resumeBtn" class="playButton" @click="playFrom" v-if="currentStep > 0 && currentStep < allNodes.length">
+            <span style="letter-spacing: -0.5rem;">▶▶</span>
+          </button>
+          <button id="startBtn" class="playButton" @click="playThrough">
+            ▶
+          </button>
+        </div>
+        <div v-else class="playControls">
+          <button id="pauseBtn" class="stopButton" @click="stopPlaying">
+            ❚❚
+          </button>
+          <button id="stopBtn" class="stopButton" @click="stopAndResetPlaying" style="font-size: 1.4rem;">
+            ■
+          </button>
+        </div>
       </div>
       <svg id="stream-viz-svg" width="100%" height="100%"/>
     </div>
@@ -25,7 +58,7 @@
 </template>
 
 <script setup lang = 'ts'>
-import {computed, defineComponent, nextTick, ref, watch} from 'vue'
+import {computed, defineComponent, nextTick, onUnmounted, ref, watch} from 'vue'
 import NavigationBarWithSettings from '@/components/NavigationBarWithSettings.vue'
 import {STREAMVIZ} from '@/store/PaneVisibilityStore'
 import { useGeneralStore } from '@/store/GeneralStore'
@@ -42,7 +75,13 @@ const allLinks = computed(() => streamVizInfo.value.links)
 const operationLines = computed(() => streamVizInfo.value.operationLines)
 const heap = computed(() => generalStore.currentTraceData?.processedTraceState?.heapBeforeExecution)
 const RADIUS = 15;
+const HALFWIDTH = 75;
+const WIDTH = 150;
+const isPlaying = ref(false);
 const currentStep = ref(0);
+const editMode = ref(false);
+const inputStep = ref(0);
+const stepInput = ref<HTMLInputElement | null>(null);
 let svg: any;
 let container: d3.Selection<SVGGElement, unknown, any, undefined>;
 let linkGroup: d3.Selection<SVGGElement, unknown, any, undefined>;
@@ -51,6 +90,7 @@ let zoom = d3.zoom()
     .scaleExtent([0.1, 10])
     .on('zoom', zoomed);
 let lastNodeX;
+let intervalId: ReturnType<typeof setInterval> | null = null;
 
 // Hilfsfunktion: Für jede ID nur den neuesten Knoten (max step <= currentStep) auswählen
 function getVisibleNodesAtStep(nodes: any, step: number) {
@@ -63,25 +103,47 @@ function getVisibleNodesAtStep(nodes: any, step: number) {
   );
 }
 
-function edgePoint(src: any, tgt: any) {
-  const dx = tgt.x - src.x;
-  const dy = tgt.y - src.y;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-  if(dist === 0) return { x: src.x, y: src.y };
-  const offsetX = (dx / dist) * RADIUS;
-  const offsetY = (dy / dist) * RADIUS;
-  return { x: src.x + offsetX, y: src.y + offsetY };
+function isSmallerType(type: string) {
+  return ["int", "long", "double", "float", "boolean", "char", "byte", "short"].includes(type);
 }
 
+function applyStep() {
+  switch (inputStep.value) {
+    case null:
+    case undefined:
+    case NaN:
+      currentStep.value = 0;
+      break;
+    default:
+      if (inputStep.value < 0) {
+        currentStep.value = 0;
+      } else if (inputStep.value > allNodes.value.reduce((max: any, n: any) => Math.max(max, n.id), 0)) {
+        currentStep.value = allNodes.value.reduce((max: any, n: any) => Math.max(max, n.id), 0);
+      } else {
+        currentStep.value = inputStep.value;
+      }
+  }
+  editMode.value = false;
+}
+
+function cancelEdit() {
+  inputStep.value = currentStep.value;
+  editMode.value = false;
+}
 
 function render() {
 
   const visibleNodes = getVisibleNodesAtStep(allNodes.value, currentStep.value);
   const visibleNodeIds = new Set(visibleNodes.map(n => n.elemId));
-  const visibleLinks = allLinks.value.filter((l: any) =>
-    l.visibleAt <= currentStep.value &&
-    visibleNodeIds.has(l.source) &&
-    visibleNodeIds.has(l.target)
+  const visibleLinks = Array.from(d3.group(
+    allLinks.value.filter((l: any) =>
+      l.visibleAt <= currentStep.value &&
+      visibleNodeIds.has(l.source) &&
+      visibleNodeIds.has(l.target)
+    ),
+    (d: any) => d.source + '-' + d.target
+  ), ([_, group]) =>
+    group.reduce((maxLink: any, current: any) => current.visibleAt > maxLink.visibleAt ? current : maxLink)
   );
   const nodes = nodeGroup.selectAll('.node')
     .data(visibleNodes, (d: any) => d.id)
@@ -93,7 +155,7 @@ function render() {
           .style('opacity', 0)
         g.each(function(d: any) {
           const group = d3.select(this);
-
+          group.selectAll('*').remove();
           if (d.direction === 'IN') {
             const size = RADIUS + 5;
 
@@ -124,9 +186,9 @@ function render() {
           } else {
             if (d.valuetype === "java.lang.String") {
               group.append('rect')
-                .attr('x', -RADIUS * 3)
+                .attr('x', -HALFWIDTH)
                 .attr('y', -RADIUS - 5)
-                .attr('width', (RADIUS) * 10)
+                .attr('width', WIDTH)
                 .attr('height', (RADIUS + 5) * 2)
                 .attr('rx', 5)
                 .attr('ry', 5)
@@ -137,7 +199,6 @@ function render() {
               group.append('text')
                   .text(d => {
                     const str = d.label;
-                    console.log("str.length: " + str.length);
                     if (str.length > 15) {
                       return `"${str.substring(0, 15)}..."`;
                     } else {
@@ -146,9 +207,8 @@ function render() {
                   })
                   .attr('text-anchor', 'middle')
                   .attr('dominant-baseline', 'middle')
-                  .attr('style', 'font-size: 0.8rem;')
-                  .attr('x', RADIUS * 2);
-            } else if (["int", "long", "double", "float", "boolean", "char", "byte", "short"].includes(d.valuetype)) {
+                  .attr('style', 'font-size: 0.8rem;');
+            } else if (isSmallerType(d.valuetype)) {
               group.append('circle')
                 .attr('r', RADIUS + 5)
                 .attr('stroke', '#333')
@@ -174,13 +234,13 @@ function render() {
                 } else {
                   result = fields.slice(0, 2);
                 }
-                result.push({ name: '...', value: { type: '...', reference: '...' } });
+                result.push({ name: '...', value: { type: '...', value: '...' } });
               }
 
               group.append('rect')
-                .attr('x', -RADIUS * 3)
+                .attr('x', -HALFWIDTH)
                 .attr('y', -RADIUS - 5)
-                .attr('width', (RADIUS) * 10)
+                .attr('width', WIDTH)
                 .attr('height', (RADIUS) * 2)
                 .attr('rx', 2)
                 .attr('ry', 2)
@@ -188,15 +248,14 @@ function render() {
                 .attr('stroke-width', 1.5)
                 .attr('fill', d.color);
 
-              g.append('text')
+              group.append('text')
                   .text(d => d.valuetype)
                   .attr('text-anchor', 'middle')
-                  .attr('dominant-baseline', 'middle')
-                  .attr('x', RADIUS * 2);
+                  .attr('dominant-baseline', 'middle');
 
               for (let i = 0; i < result.length; i++) {
                 group.append('rect')
-                  .attr('x', -RADIUS * 3)
+                  .attr('x', -HALFWIDTH)
                   .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
                   .attr('width', (RADIUS) * 5)
                   .attr('height', (RADIUS + 5) + 10)
@@ -204,35 +263,42 @@ function render() {
                   .attr('ry', 2)
                   .attr('stroke', '#333')
                   .attr('stroke-width', 1.5)
-                    // set color based on d.color but with 20% opacity
                   .attr('fill', d3.color(d.color)?.copy({ opacity: 0.2 })?.toString() || d.color);
 
                 group.append('text')
                   .text(d => result[i].name)
-                  .attr('text-anchor', 'start')
+                  .attr('text-anchor', 'middle')
                   .attr('dominant-baseline', 'middle')
                   .attr('y', 30 * i + 25)
-                  .attr('x', -RADIUS * 3 + 5)
+                  .attr('x', -HALFWIDTH/2)
                   .attr('style', 'font-size: 0.8rem;');
 
                 group.append('rect')
-                    .attr('x', RADIUS * 2)
+                    .attr('x', 0)
                     .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
-                    .attr('width', (RADIUS) * 5)
+                    .attr('width', HALFWIDTH)
                     .attr('height', (RADIUS + 5) + 10)
                     .attr('rx', 2)
                     .attr('ry', 2)
                     .attr('stroke', '#333')
                     .attr('stroke-width', 1.5)
-                    // set color based on d.color but with 20% opacity
                     .attr('fill', d3.color(d.color)?.copy({ opacity: 0.2 })?.toString() || d.color);
 
                 group.append('text')
                   .text(d => {
                     const object = result[i].value;
                     console.log(object);
+                    console.log('Heap:');
+                    console.log(heap.value);
                     if (object.reference) {
-                      let t = heap.value?.find(obj => obj.id === object.reference)?.string || object.reference;
+                      let refobject = heap.value?.find(obj => obj.id === object.reference);
+                      let t = refobject?.string;
+
+                      if (!t) {
+                        let type = refobject.type;
+                        t = type.substring(type.lastIndexOf('.') + 1, type.length);
+                      }
+
                       if (t.length > 10) {
                         t = t.substring(0, 10) + "...";
                       }
@@ -240,16 +306,17 @@ function render() {
                       return t;
                     } else if (object.primitiveValue) {
                       return object.primitiveValue;
+                    } else if (object.value) {
+                      return object.value;
                     }
                     return '';
                   })
-                  .attr('text-anchor', 'start')
+                  .attr('text-anchor', 'middle')
                   .attr('dominant-baseline', 'middle')
                   .attr('y', 30 * i + 25)
-                  .attr('x', -RADIUS * 1.5 * -2 - 5)
+                  .attr('x', HALFWIDTH/2)
                   .attr('style', 'font-size: 0.8rem;');
               }
-
             }
           }
         });
@@ -271,58 +338,38 @@ function render() {
     .duration(500)
     .attr('fill', d => d.color);
 
-  // nodes.select('text')
-  //      .text(d => {
-  //        if (d.direction === 'IN') return  '';
-  //        if (["int", "long", "double", "float", "boolean", "char", "byte", "short"].includes(d.valuetype)) {
-  //          return d.label;
-  //        } else if (d.valuetype === "java.lang.String") {
-  //          const str = d.label;
-  //          console.log("str.length: " + str.length);
-  //          if (str.length > 10) {
-  //            return `"${str.substring(0, 10)}..."`;
-  //          } else {
-  //            return `"${str}"`;
-  //          }
-  //        } else {
-  //          const object = heap.value?.find(obj => obj.id.toString() === d.label);
-  //
-  //          const refId = object.fields?.[1]?.value?.reference;
-  //          const refObj = heap.value?.find(obj => obj.id === refId);
-  //          let t = refObj?.string || d.label;
-  //
-  //          if (t.length > 10) {
-  //            t = t.substring(0, 10) + "...";
-  //          }
-  //
-  //          return t;
-  //        }
-  //      })
-  //     .attr('style', d => d.valuetype === "java.lang.String" ? 'font-size: 0.8rem;' : '');
-
   const nodeLinksMap = new Map(visibleNodes.map(node => [node.elemId, node]));
   const links = linkGroup.selectAll('.link')
     .data(visibleLinks, (d: any) => d.source + '-' + d.target)
     .join(
-      enter => enter.append('line')
-        .attr('class', 'link')
-        .style('opacity', 0)
-        .attr('x1', (d: any) => {
-          const src = nodeLinksMap.get(d.source);
-          return src ? src.x : 0;
-        })
-        .attr('y1', (d: any) => {
-          const src = nodeLinksMap.get(d.source);
-          return src ? src.y : 0;
-        })
-        .attr('x2', (d: any) => { // Start the line collapsed at the source
-          const src = nodeLinksMap.get(d.source);
-          return src ? src.x : 0;
-        })
-        .attr('y2', (d: any) => { // Start the line collapsed at the source
-          const src = nodeLinksMap.get(d.source);
-          return src ? src.y : 0;
-        }),
+      enter => {
+        console.log("Links:")
+        console.log(visibleLinks);
+        const g = enter.append('line')
+            .attr('class', 'link')
+            .style('opacity', 0)
+            .attr('x1', (d: any) => {
+              const src = nodeLinksMap.get(d.source);
+              return src ? src.x : 0;
+            })
+            .attr('y1', (d: any) => {
+              const src = nodeLinksMap.get(d.source);
+              return src ? src.y : 0;
+            })
+            .attr('x2', (d: any) => { // Start the line collapsed at the source
+              const src = nodeLinksMap.get(d.source);
+              return src ? src.x : 0;
+            })
+            .attr('y2', (d: any) => { // Start the line collapsed at the source
+              const src = nodeLinksMap.get(d.source);
+              return src ? src.y : 0;
+            });
+        g.each(function(d: any) {
+          console.log("Link:")
+          console.log(d);
+        });
+        return g;
+      },
       update => update,
       exit => exit
         .transition()
@@ -336,23 +383,31 @@ function render() {
     .style('opacity', 1) // Fades in new links
     .attr('x1', (d: any) => {
       const src = nodeLinksMap.get(d.source);
-      const tgt = nodeLinksMap.get(d.target);
-      return edgePoint(src, tgt).x;
+      // const tgt = nodeLinksMap.get(d.target);
+      // return edgePoint(src, tgt).x;
+      return src ? src.x : 0;
     })
     .attr('y1', (d: any) => {
       const src = nodeLinksMap.get(d.source);
-      const tgt = nodeLinksMap.get(d.target);
-      return edgePoint(src, tgt).y;
+      // const tgt = nodeLinksMap.get(d.target);
+      // return edgePoint(src, tgt).y;
+      if (src.valuetype === "java.lang.String" || isSmallerType(src.valuetype)) {
+        return src.y + 20;
+      }
+      console.log(heap.value?.find(obj => obj.id.toString() === src.label));
+      return src.y + (heap.value?.find(obj => obj.id.toString() === src.label).fields.length + 1) * 20;
     })
     .attr('x2', (d: any) => {
-      const src = nodeLinksMap.get(d.source);
+      // const src = nodeLinksMap.get(d.source);
       const tgt = nodeLinksMap.get(d.target);
-      return edgePoint(tgt, src).x;
+      // return edgePoint(tgt, src).x;
+      return tgt ? tgt.x : 0;
     })
     .attr('y2', (d: any) => {
-      const src = nodeLinksMap.get(d.source);
+      // const src = nodeLinksMap.get(d.source);
       const tgt = nodeLinksMap.get(d.target);
-      return edgePoint(tgt, src).y;
+      // return edgePoint(tgt, src).y;
+      return tgt ? tgt.y - 20 : 0;
     });
 }
 
@@ -365,6 +420,46 @@ function stepForwards() {
 function stepBack() {
   if (currentStep.value > 0) {
     currentStep.value--;
+  }
+}
+
+function playThrough() {
+  if (isPlaying.value) {
+    return;
+  }
+  currentStep.value = 0;
+  render();
+  play();
+}
+
+function playFrom() {
+  if (isPlaying.value) {
+    return;
+  }
+  play();
+}
+
+function play() {
+  isPlaying.value = true;
+  intervalId = setInterval(() => {
+    if (isPlaying && currentStep.value < allNodes.value.reduce((max: any, n: any) => Math.max(max, n.id), 0)) {
+      currentStep.value++;
+    } else {
+      stopPlaying()
+    }
+  }, 800);
+}
+
+function stopAndResetPlaying() {
+  currentStep.value = 0;
+  stopPlaying();
+}
+
+function stopPlaying() {
+  isPlaying.value = false;
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
   }
 }
 
@@ -399,6 +494,7 @@ function zoomAndCenter() {
 }
 
 watch(streamVizInfo, (newVal, oldVal) => {
+  stopPlaying();
   if (streamVizInfo.value.marbles.length > 0 && oldVal && JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
     currentStep.value = 0;
     nextTick(() => {
@@ -418,10 +514,10 @@ watch(streamVizInfo, (newVal, oldVal) => {
       svg.append('defs').append('marker')
         .attr('id', 'arrow')
         .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 13)
+        .attr('refX', 10)
         .attr('refY', 0)
-        .attr('markerWidth', 6)
-        .attr('markerHeight', 6)
+        .attr('markerWidth', 8)
+        .attr('markerHeight', 10)
         .attr('orient', 'auto')
         .append('path')
         .attr('d', 'M0,-5L10,0L0,5')
@@ -463,6 +559,20 @@ watch(streamVizInfo, (newVal, oldVal) => {
 watch(currentStep, () => {
   render();
 });
+
+watch(editMode, (val) => {
+  if (val) {
+    inputStep.value = currentStep.value;
+  }
+  nextTick(() => {
+    stepInput.value?.focus();
+    stepInput.value?.select();
+  })
+});
+
+onUnmounted(() => {
+  stopPlaying();
+})
 </script>
 
 <style>
@@ -502,4 +612,53 @@ text {
   background-color: grey;
   box-shadow: 0px 0px 15px grey;
 }
+
+.playControls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.playControls button {
+  font-size: 1.2rem;
+  padding: 5px 13px 5px 12px;
+  border-radius: 15px;
+  border: 2px solid black;
+  background-color: #efefef;
+  cursor: pointer;
+}
+
+.playButton {
+  color: green;
+}
+
+.playButton:hover {
+  background-color: lightgreen;
+  color: black;
+}
+
+.stopButton {
+  color: red;
+}
+
+.stopButton:hover {
+  background-color: lightcoral;
+  color: black;
+}
+
+.inputField {
+  width: 3.5rem;
+  font-size: 1.2rem;
+  text-align: center;
+  border: 2px solid grey;
+  border-radius: 5px;
+  padding: 5px 0px;
+}
+
+.inputField:focus {
+  outline: none;
+  border-color: grey;
+  box-shadow: 0 0 5px grey;
+}
+
 </style>
