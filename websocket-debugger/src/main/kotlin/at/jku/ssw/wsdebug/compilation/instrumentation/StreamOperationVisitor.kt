@@ -76,7 +76,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
     private val openStreams = mutableListOf<Int>()
     private var numberOfStreams = -1
     private var actualStreamID = -1
-    private val terminalOperations = setOf("count", "max", "min", "reduce", "collect", "forEach", "toArray")
+    private val terminalOperations = setOf("count", "max", "min", "reduce", "collect", "forEach", "toArray", "toList", "toSet", "findFirst", "findAny", "anyMatch", "allMatch", "noneMatch")
     private var lambdaLevel = 0
 
     fun getStreamOperations(): List<StreamOperation> {

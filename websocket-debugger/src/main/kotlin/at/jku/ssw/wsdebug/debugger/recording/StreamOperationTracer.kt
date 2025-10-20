@@ -118,8 +118,6 @@ class StreamOperationTracer {
                 // parentIDs is the list of parent IDs of the last count operation plus the current element ID or the last trace value's element ID
                 val parentIDs = (lastCountOp?.parentIDs ?: mutableListOf()).toMutableList().apply { add (lastTraceValue!!.elementID) }
                 val count = (lastCountOp?.value.let {
-                    println("Count:" + it)
-                    println(it?.javaClass?.simpleName)
                     when (it) {
                         is Int -> it + 1
                         is String -> (it.toIntOrNull() ?: 0) + 1
@@ -127,6 +125,14 @@ class StreamOperationTracer {
                     }
                 })
                 addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "int", count)
+            }
+            "toList", "toArray" -> {
+                val lastListOp = lastInOps[actualStreamID]?.get(operationID)
+                val elemID = lastListOp?.elementID ?: elementcounter.also { elementcounter++ }
+                val parentIDs = (lastListOp?.parentIDs ?: mutableListOf()).toMutableList().apply { add (lastTraceValue!!.elementID) }
+                val list = parentIDs.toMutableList()
+                val type = if (type == "toList") "List" else "Array"
+                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, list)
             }
 //            "max" -> {
 //                val lastInOp = lastInOps[operationID]
@@ -187,7 +193,7 @@ class StreamOperationTracer {
             if (op.seq > 0 || (op.direction == "IN" && op.type == "filter")) {
                 if (op.type == "filter") {
                     if (op.direction == "OUT") {
-                        nodes.last().color = getMarbleColor(op.elementID, false)
+                        nodes.last().color = getMarbleColor(op)
                         nodes.last().direction = op.direction
                         seqOffset--
                         continue
@@ -210,7 +216,6 @@ class StreamOperationTracer {
                     visualizationObjects.lastX
                 } else {
                     if (containsBigType) {
-//                    if (!arrayOf("int", "long", "double", "float", "boolean").contains(lines[op.operationID]!!.valuetype)) {
                         visualizationObjects.lastX += 200
                     } else {
                         visualizationObjects.lastX += 100
@@ -227,8 +232,11 @@ class StreamOperationTracer {
                     val visibleAt = currentseq
                     parents.forEach { p -> links.add(StreamLink(p.elemId, elemId, visibleAt)) }
                 }
-                nodes.add(StreamMarble(currentseq, elemId, x, y, op.valuetype, op.value.toString(), op.operationID, op.type, getMarbleColor(op.elementID, op.direction == "IN"), op
-                    .direction))
+                val label = when (op.valuetype) {
+                    "List", "Array" -> parents.joinToString(", ") { p -> p.elemId }
+                    else -> op.value.toString()
+                }
+                nodes.add(StreamMarble(currentseq, elemId, x, y, op.valuetype, label, op.operationID, op.type, getMarbleColor(op), op.direction))
                 lastopID = op.operationID
                 lastValueType = op.valuetype ?: lastValueType
             }
@@ -240,15 +248,21 @@ class StreamOperationTracer {
         return visualizationObjects
     }
 
-    private fun getMarbleColor(value: Int, isWhite: Boolean): String {
-        if (isWhite) return "#FFFFFF"
-        val goldenAngle = 137.508  // idealer Abstand in Grad (laut ChatGPT)
-        val hue = ((value.hashCode().absoluteValue * goldenAngle) % 360).toFloat() / 360f
-        val saturation = 0.6f
-        val brightness = 0.95f
+    private fun getMarbleColor(value: StreamOperationValue): String {
+        if (value.direction == "IN") return "#FFFFFF"
+        when (value.type) {
+            "List" -> return "#DBDBDB"
+            "Array" -> return "#CCEEFF"
+            else -> {
+                val goldenAngle = 137.508  // idealer Abstand in Grad (laut ChatGPT)
+                val hue = ((value.elementID.hashCode().absoluteValue * goldenAngle) % 360).toFloat() / 360f
+                val saturation = 0.6f
+                val brightness = 0.95f
 
-        val color = Color.getHSBColor(hue, saturation, brightness)
-        return "#%02x%02x%02x".format(color.red, color.green, color.blue)
+                val color = Color.getHSBColor(hue, saturation, brightness)
+                return "#%02x%02x%02x".format(color.red, color.green, color.blue)
+            }
+        }
     }
 }
 
