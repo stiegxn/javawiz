@@ -475,8 +475,7 @@ function renderVerticalListNode(group: d3.Selection<SVGGElement, any, any, any>,
     }
   }
 
-  const subGroup = group.append('g')
-      .attr('class', 'list-type-label');
+  const subGroup = group.append('g');
 
   for (let i = 0; i < length; i++) {
     const elemNode = allNodes.value.find(n => n.elemId.toString() === labelAsList[i].trim());
@@ -493,12 +492,13 @@ function renderVerticalListNode(group: d3.Selection<SVGGElement, any, any, any>,
     }
   }
 
-  let bbox = subGroup.node()?.getBBox();
+  const bbox = subGroup.node()?.getBBox();
+  const width = bbox ? Math.max(bbox.width + MARGIN * 2, WIDTH + MARGIN * 2) : WIDTH + MARGIN * 2;
 
   group.insert('rect', ':first-child')
       .attr('x', -HALFWIDTH - MARGIN)
       .attr('y', -RADIUS - 5)
-      .attr('width', WIDTH + MARGIN * 2)
+      .attr('width', width)
       .attr('height', elemHeight * length + MARGIN)
       .attr('rx', 5)
       .attr('ry', 5)
@@ -554,22 +554,12 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
   let elems = elem.elements;
   let length = elems.length;
 
-  group.append('rect')
-      .attr('x', -HALFWIDTH - 2)
-      .attr('y', -RADIUS - 5)
-      .attr('width', WIDTH + 4)
-      .attr('height', (RADIUS + 5) * 2)
-      .attr('rx', 5)
-      .attr('ry', 5)
-      .attr('stroke', '#333')
-      .attr('stroke-width', 1.5)
-      .attr('fill', d.color);
-
   for (let i = 0; i < length; i++) {
     let elemNode = heap.value.find(n => n.id === elems[i].value.reference);
     if (!elemNode) {
+      const cx = -HALFWIDTH + (i + 1) * RADIUS * 2 - RADIUS;
       group.append('circle')
-          .attr('cx', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2)
+          .attr('cx', cx)
           .attr('r', RADIUS - 1)
           .attr('stroke', '#333')
           .attr('stroke-width', 1.5)
@@ -578,10 +568,25 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
           .text(elems[i].value.primitiveValue)
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'middle')
-          .attr('x', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2)
+          .attr('x', cx)
           .attr('font-size', miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px');
     }
   }
+
+  const bbox = group.node()?.getBBox();
+  const width = bbox ? Math.max(bbox.width + 4, WIDTH) : WIDTH;
+
+  group.insert('rect', ':first-child')
+      .attr('x', -HALFWIDTH - 2)
+      .attr('y', -RADIUS - 5)
+      .attr('width', width)
+      .attr('height', (RADIUS + 5) * 2)
+      .attr('rx', 5)
+      .attr('ry', 5)
+      .attr('stroke', '#333')
+      .attr('stroke-width', 1.5)
+      .attr('fill', d.color);
+
 }
 
 function stepForwards() {
