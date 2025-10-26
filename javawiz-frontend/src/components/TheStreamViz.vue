@@ -109,6 +109,13 @@ const miniCircleFontSize = new Map<number, string>([
   [10, '5px']
 ]);
 
+const miniStringLength = new Map<number, number>([
+  [1, 15],
+  [2, 7],
+  [3, 5],
+  [4, 4]
+]);
+
 let svg: any;
 let container: d3.Selection<SVGGElement, unknown, any, undefined>;
 let linkGroup: d3.Selection<SVGGElement, unknown, any, undefined>;
@@ -245,8 +252,6 @@ function render() {
     .data(visibleLinks, (d: any) => d.source + '-' + d.target)
     .join(
       enter => {
-        console.log("Links:")
-        console.log(visibleLinks);
         const g = enter.append('line')
             .attr('class', 'link')
             .style('opacity', 0)
@@ -266,10 +271,6 @@ function render() {
               const src = nodeLinksMap.get(d.source);
               return src ? src.y : 0;
             });
-        g.each(function(d: any) {
-          console.log("Link:")
-          console.log(d);
-        });
         return g;
       },
       update => update,
@@ -285,21 +286,15 @@ function render() {
     .style('opacity', 1) // Fades in new links
     .attr('x1', (d: any) => {
       const src = nodeLinksMap.get(d.source);
-      // const tgt = nodeLinksMap.get(d.target);
-      // return edgePoint(src, tgt).x;
       return src ? src.x : 0;
     })
     .attr('y1', (d: any) => {
       const src = nodeLinksMap.get(d.source);
-      // const tgt = nodeLinksMap.get(d.target);
-      // return edgePoint(src, tgt).y;
       if (src.valuetype === "java.lang.String" || isSmallerType(src.valuetype) || src.valuetype.includes('[]')) {
         return src.y + 20;
       } else if (src.valuetype === "List" || src.valuetype === "Array" ) {
         return src.y + 30;
       }
-      console.log("Source Node:");
-      console.log(src);
       const objectfieldslength = heap.value?.find(obj => obj.id.toString() === src.label).fields.length || 0;
       const fieldOffset = (objectfieldslength > 3 ? 3.5 : objectfieldslength);
       return src.y + fieldOffset * 30 + 10;
@@ -426,7 +421,6 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
     group.append('text')
         .text(d => {
           const object = result[i].value;
-          console.log(object);
           console.log('Heap:');
           console.log(heap.value);
           if (object.reference) {
@@ -493,13 +487,17 @@ function renderVerticalListNode(group: d3.Selection<SVGGElement, any, any, any>,
   }
 
   const bbox = subGroup.node()?.getBBox();
-  const width = bbox ? Math.max(bbox.width + MARGIN * 2, WIDTH + MARGIN * 2) : WIDTH + MARGIN * 2;
+  let width = WIDTH + MARGIN * 2, height = elemHeight * length + MARGIN;
+  if (bbox) {
+    width = Math.max(bbox.width + MARGIN * 2, WIDTH + MARGIN * 2);
+    height = bbox.height + MARGIN * 2;
+  }
 
   group.insert('rect', ':first-child')
       .attr('x', -HALFWIDTH - MARGIN)
       .attr('y', -RADIUS - 5)
       .attr('width', width)
-      .attr('height', elemHeight * length + MARGIN)
+      .attr('height',  height)
       .attr('rx', 5)
       .attr('ry', 5)
       .attr('stroke', '#333')
@@ -517,12 +515,23 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
     elems = [elem.elements[0], elem.elements[1], {name: '...', value: { primitiveValue: '...' }}, elem.elements[elem.elements.length - 2],
       elem.elements[elem.elements.length - 1]];
   }
+  let height = (RADIUS + 5) * 2;
+  const type = elem.type.endsWith('[]') ?
+      elem.type.substring(0, elem.type.length - 2) :
+      elem.type;
+  if (!isSmallerType(type) && type !== "java.lang.String") {
+    const firstElemNode = heap.value.find(n => n.id === elems[0].value.reference);
+    if (firstElemNode) {
+      const fieldsLength = firstElemNode.fields.length;
+      height = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
+    }
+  }
 
   group.append('rect')
       .attr('x', -HALFWIDTH - 2)
       .attr('y', -RADIUS - 5)
       .attr('width', WIDTH + 4)
-      .attr('height', (RADIUS + 5) * 2)
+      .attr('height', height)
       .attr('rx', 5)
       .attr('ry', 5)
       .attr('stroke', '#333')
@@ -544,6 +553,35 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
           .attr('dominant-baseline', 'middle')
           .attr('x', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2)
           .attr('font-size', miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px');
+    } else {
+      console.log('Rendering element node inside horizontal list:');
+      console.log(elemNode);
+      if (elemNode.type === "java.lang.String") {
+        group.append('rect')
+            .attr('x', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2 - HALFWIDTH / length)
+            .attr('y', -RADIUS)
+            .attr('width', WIDTH/length)
+            .attr('height', (RADIUS - 1) * 2)
+            .attr('rx', 5)
+            .attr('ry', 5)
+            .attr('stroke', '#333')
+            .attr('stroke-width', 1.5)
+            .attr('fill', '#f0f0f0');
+        group.append('text')
+            .text(() => {
+              const str = elemNode.label || elemNode.string;
+              let maxLength = miniStringLength.get(length) || 3;
+              if (str.length > maxLength) {
+                return `"${str.substring(0, maxLength)}..."`;
+              } else {
+                return `"${str}"`;
+              }
+            })
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'middle')
+            .attr('x', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2)
+            .attr('font-size', '9px');
+      }
     }
   }
 }
@@ -553,6 +591,7 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
   let elem = heap.value.find(n => n.id.toString() === labelAsList[0]);
   let elems = elem.elements;
   let length = elems.length;
+  let stringlength = 0;
 
   for (let i = 0; i < length; i++) {
     let elemNode = heap.value.find(n => n.id === elems[i].value.reference);
@@ -570,11 +609,47 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
           .attr('dominant-baseline', 'middle')
           .attr('x', cx)
           .attr('font-size', miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px');
+    } else {
+      if (elemNode.type === "java.lang.String") {
+        const label = elemNode.label || elemNode.string;
+        const textValue = '"' + label + '"';
+
+        const tempText = group.append('text')
+            .text(textValue)
+            .attr('font-size', '9px')
+            .attr('visibility', 'hidden'); // unsichtbar, aber messbar
+
+        const textWidth = tempText.node().getBBox().width;
+
+        const x = -HALFWIDTH + stringlength + MARGIN / 2;
+        const rectWidth = textWidth + MARGIN; // bisschen Puffer
+
+        group.append('rect')
+            .attr('x', x)
+            .attr('y', -RADIUS)
+            .attr('width', rectWidth)
+            .attr('height', (RADIUS - 1) * 2)
+            .attr('rx', 5)
+            .attr('ry', 5)
+            .attr('stroke', '#333')
+            .attr('stroke-width', 1.5)
+            .attr('fill', '#f0f0f0');
+
+        group.append('text')
+            .text(textValue)
+            .attr('text-anchor', 'left')
+            .attr('dominant-baseline', 'middle')
+            .attr('x', x + MARGIN / 2)
+            .attr('font-size', '9px');
+
+        tempText.remove();
+        stringlength += rectWidth;
+      }
     }
   }
 
   const bbox = group.node()?.getBBox();
-  const width = bbox ? Math.max(bbox.width + 4, WIDTH) : WIDTH;
+  const width = bbox ? Math.max(bbox.width + MARGIN, WIDTH) : WIDTH;
 
   group.insert('rect', ':first-child')
       .attr('x', -HALFWIDTH - 2)
