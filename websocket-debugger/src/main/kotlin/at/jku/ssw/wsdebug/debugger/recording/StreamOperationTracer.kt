@@ -29,7 +29,8 @@ class StreamOperationTracer {
         elementID: Int,
         parentIDs: MutableList<Int>,
         valuetype: String?,
-        value: Any
+        value: Any,
+        param: String
     ) {
         // increment sequence counter if dircetion is not IN, because IN operations are not needed in the visualization later
         val seq = if (direction != "IN") {
@@ -40,7 +41,7 @@ class StreamOperationTracer {
             0
         }
         val streamOperationValue = StreamOperationValue(
-            seq, type, direction, operationID, elementID, parentIDs, valuetype, value
+            seq, type, direction, operationID, elementID, parentIDs, valuetype, value, param
         )
         streamtrace[actualStreamID]?.add(streamOperationValue)
         if (direction != "OUT") {
@@ -63,7 +64,7 @@ class StreamOperationTracer {
             sequenceCounter[streamId] = 0
             streamtrace[streamId] = mutableListOf()
         }
-        addStreamOperationValue(type, "START", operationID, elementcounter, mutableListOf(elementcounter), valuetype, value)
+        addStreamOperationValue(type, "START", operationID, elementcounter, mutableListOf(elementcounter), valuetype, value, "")
         elementcounter++
     }
 
@@ -72,10 +73,11 @@ class StreamOperationTracer {
         operationID: Int,
         value: Any,
         valuetype: String?,
-        streamId: Int
+        streamId: Int,
+        param: String
     ) {
         actualStreamID = streamId
-        addStreamOperationValue(type, "IN", operationID, lastTraceValue!!.elementID, mutableListOf(lastTraceValue!!.elementID), valuetype, value)//lastTraceValue!!.parentIDs
+        addStreamOperationValue(type, "IN", operationID, lastTraceValue!!.elementID, mutableListOf(lastTraceValue!!.elementID), valuetype, value, param)//lastTraceValue!!.parentIDs
     // .toMutableList(),
     // value)
     }
@@ -85,7 +87,8 @@ class StreamOperationTracer {
         operationID: Int,
         value: Any,
         valuetype: String?,
-        streamId: Int
+        streamId: Int,
+        param: String
     ) {
         actualStreamID = streamId
         var elemID = if (type == "flatMap" && lastInOps[actualStreamID]?.get(operationID)!!.value != value) {
@@ -102,13 +105,14 @@ class StreamOperationTracer {
             elemID = nextSorted.elementID
             sortedTrace.remove(nextSorted)
         }
-        addStreamOperationValue(type, "OUT", operationID, elemID, parentIDs.toMutableList(), valuetype, value)
+        addStreamOperationValue(type, "OUT", operationID, elemID, parentIDs.toMutableList(), valuetype, value, param)
     }
 
     fun traceEndStream(
         type: String,
         operationID: Int,
-        streamId: Int
+        streamId: Int,
+        param: String
     ) {
         actualStreamID = streamId
         when (type) {
@@ -124,7 +128,7 @@ class StreamOperationTracer {
                         else -> 1
                     }
                 })
-                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "int", count)
+                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "int", count, param)
             }
             "toList", "toArray" -> {
                 val lastListOp = lastInOps[actualStreamID]?.get(operationID)
@@ -132,7 +136,7 @@ class StreamOperationTracer {
                 val parentIDs = (lastListOp?.parentIDs ?: mutableListOf()).toMutableList().apply { add (lastTraceValue!!.elementID) }
                 val list = parentIDs.toMutableList()
                 val type = if (type == "toList") "List" else "Array"
-                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, list)
+                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, list, param)
             }
 //            "max" -> {
 //                val lastInOp = lastInOps[operationID]
@@ -155,7 +159,7 @@ class StreamOperationTracer {
 //                }
 //            }
             else -> {
-                addStreamOperationValue(type, "END", operationID, lastTraceValue!!.elementID, lastTraceValue!!.parentIDs.toMutableList(), null,"")
+                addStreamOperationValue(type, "END", operationID, lastTraceValue!!.elementID, lastTraceValue!!.parentIDs.toMutableList(), null,"", param)
             }
         }
     }
@@ -188,7 +192,7 @@ class StreamOperationTracer {
                     }
                 }
                 println("New YValue for operation ${op.operationID} (${op.type}): $yValue")
-                lines[op.operationID] = StreamOperationLine(op.type, yValue, op.valuetype)
+                lines[op.operationID] = StreamOperationLine(op.type, yValue, op.valuetype, op.param)
             }
             if (op.seq > 0 || (op.direction == "IN" && op.type == "filter")) {
                 if (op.type == "filter") {
@@ -216,7 +220,12 @@ class StreamOperationTracer {
                     visualizationObjects.lastX
                 } else {
                     if (containsBigType) {
-                        visualizationObjects.lastX += 200
+                        if (op.valuetype!!.endsWith("[]") &&
+                            !arrayOf("int", "long", "double", "float", "boolean", "char", "byte", "short", "java.lang.String").contains(op.valuetype.removeSuffix("[]"))) {
+                            visualizationObjects.lastX += 300
+                        } else {
+                            visualizationObjects.lastX += 200
+                        }
                     } else {
                         visualizationObjects.lastX += 100
                     }
@@ -274,7 +283,8 @@ data class StreamOperationValue (
     val elementID: Int,
     val parentIDs: List<Int>,
     val valuetype: String?,
-    val value: Any
+    val value: Any,
+    val param: String
 )
 
 data class StreamMarble(
@@ -301,7 +311,8 @@ data class StreamLink (
 data class StreamOperationLine (
     val type: String,
     val y: Int,
-    val valuetype: String?
+    val valuetype: String?,
+    val param: String?
 )
 
 data class StreamVisualizationInfo (

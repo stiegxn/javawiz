@@ -31,6 +31,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     openStreams.add(numberOfStreams)
                     streamOperations[actualStreamID] = mutableListOf()
                 }
+                // ToDo: Replace for all terminal operations
                 if (name == "max" || name == "min") {
                     if (methodInvocation.args.isNotEmpty()) {
                         hasParam = true
@@ -44,6 +45,13 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     beginLine = pos.getBeginLineStreamOp(meth)
                     beginColumn = pos.getBeginColumnStreamOp(meth)
                 }
+                var firstArgAsString: String = ""
+                if (methodInvocation.args.isNotEmpty()) {
+                    hasParam = true
+                    firstArgAsString = methodInvocation.args[0].toString()
+                    firstArgAsString = escapeForJavaString(firstArgAsString)
+                }
+
                 streamOperations[actualStreamID]!!.add(StreamOperation(
                     beginLine,
                     beginColumn,
@@ -52,6 +60,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     meth.name.toString(),
                     streamOperations[actualStreamID]!!.size,
                     hasParam,
+                    firstArgAsString,
                     actualStreamID
                 ))
             } else if (meth.name.toString() == "stream") {
@@ -63,6 +72,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     "stream",
                     streamOperations[actualStreamID]!!.size,
                     false,
+                    "",
                     actualStreamID
                 ))
                 openStreams.remove(actualStreamID)
@@ -90,6 +100,15 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                 type == "java.util.stream.IntStream" ||
                 type == "java.util.stream.LongStream" ||
                 type == "java.util.stream.DoubleStream"
+    }
+
+    private fun escapeForJavaString(text: String): String {
+        return text
+            .replace("\\", "\\\\")   // erst Backslashes doppeln
+            .replace("\"", "\\\"")   // dann Anführungszeichen escapen
+            .replace("\r\n", "\\\\n") // Windows-Zeilenumbrüche
+            .replace("\n", "\\\\n")   // Unix-Zeilenumbrüche
+            .replace("\t", "\\\\t")   // Tabs
     }
 
     override fun visitLambda(tree: JCTree.JCLambda) {

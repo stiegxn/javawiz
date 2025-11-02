@@ -795,9 +795,72 @@ watch(streamVizInfo, (newVal, oldVal) => {
         .attr('y', (d: any) => d.y - 5)
         .attr('text-anchor', 'end')
         .text((d: any) => d.type)
-        .attr('fill', '#888')
-        .attr('font-size', '11px')
-        .attr('style', 'font-size: 1.5rem; user-select: none;');
+        .attr('fill', '#555')
+        .attr('font-size', '24px');
+
+      const paramLabelGroups = container.selectAll('.param-label-group')
+          .data(Object.values({ ...operationLines.value }))
+          .join(
+              enter => {
+                const g = enter.append('g')
+                    .attr('class', 'param-label-group')
+                    .attr('transform', (d: any) => `translate(${lastNodeX + 150}, ${d.y + 25})`); // <<-- Verschiebt die ganze Gruppe
+
+                // Füge ein leeres Text-Element hinzu, um die tspan-Elemente aufzunehmen
+                g.append('text')
+                    .attr('class', 'param-label')
+                    .attr('text-anchor', 'start')
+                    .attr('fill', '#666') // Etwas dunkler als #888, aber heller als der Op-Name
+                    .attr('font-size', '16px')
+                    .style('font-family', 'Monospace, Courier New, monospace')
+                    .attr('xml:space', 'preserve')
+                    .style('pointer-events', 'none'); // Text selbst ignoriert Events
+
+                return g;
+              },
+              update => {
+                update.attr('transform', (d: any) => `translate(${lastNodeX + 10}, ${d.y + 25})`);
+                return update;
+              },
+              exit => exit.remove()
+          );
+
+
+      paramLabelGroups.each(function(d: any) {
+        const group = d3.select(this);
+        const textElement = group.select('.param-label');
+        textElement.selectAll('tspan').remove();
+
+        const lines = d.param.replace(/\\n/g, '\n').split('\n');
+
+        lines.forEach((line: string, i: number) => {
+          textElement.append('tspan')
+              .attr('x', 0)
+              .attr('dy', i === 0 ? 0 : '1.2em')
+              .text(line);
+        });
+
+        const bbox = textElement.node()?.getBBox();
+
+        if (bbox && bbox.width > 0 && bbox.height > 0) {
+          group.select('.param-bg-rect').remove(); // Altes Rechteck entfernen, falls vorhanden
+
+          group.insert('rect', '.param-label') // Fügt das Rechteck VOR dem Text ein
+              .attr('class', 'param-bg-rect')
+              .attr('x', bbox.x - 5) // Etwas Polsterung links
+              .attr('y', bbox.y - 3) // Etwas Polsterung oben
+              .attr('width', bbox.width + 10) // Polsterung links+rechts
+              .attr('height', bbox.height + 6) // Polsterung oben+unten
+              .attr('rx', 4) // Abgerundete Ecken
+              .attr('ry', 4)
+              .attr('fill', '#f0f0f0') // Hellgrau
+              .attr('opacity', 0.8) // Leicht transparent
+              .style('pointer-events', 'none'); // Ignoriert Mausereignisse
+        } else {
+          // Falls bbox leer ist (z.B. d.param ist leer), das Rechteck entfernen
+          group.select('.param-bg-rect').remove();
+        }
+      });
 
       linkGroup = container.append('g').attr('class', 'links');
       nodeGroup = container.append('g').attr('class', 'nodes');

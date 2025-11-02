@@ -346,11 +346,12 @@ class JDIVirtualMachine(
                 val operationName = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("name")!!) as StringReference).value()
                 val operationId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("id")!!) as IntegerValue).value()
                 val streamId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("streamId")!!) as IntegerValue).value()
+                val param = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("param")!!) as StringReference).value()
                 when (direction) {
                     "START" -> streamOperationTracer.traceStartStream(operationName, operationId, value, valuetype, streamId)
-                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, value, valuetype, streamId)
-                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, value, valuetype, streamId)
-                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId)
+                    "IN" -> streamOperationTracer.traceInStream(operationName, operationId, value, valuetype, streamId, param)
+                    "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, value, valuetype, streamId, param)
+                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId, param)
                     else -> error("unknown direction for stream element")//streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf
                 // (0), value)
                 }

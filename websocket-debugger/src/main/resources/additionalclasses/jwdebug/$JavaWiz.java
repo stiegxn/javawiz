@@ -8,16 +8,16 @@ public class $JavaWiz {
         return index;
     }
 
-    public static void traceStream(String direction, Object elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, String elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, int elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, long elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, double elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, float elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, char elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, byte elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, short elem, String name, int id, int streamId) {}
-    public static void traceStream(String direction, boolean elem, String name, int id, int streamId) {}
+    public static void traceStream(String direction, Object elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, String elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, int elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, long elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, double elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, float elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, char elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, byte elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, short elem, String name, int id, int streamId, String param) {}
+    public static void traceStream(String direction, boolean elem, String name, int id, int streamId, String param) {}
 
 
     public static void traceParam() {}
