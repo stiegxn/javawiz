@@ -257,8 +257,12 @@ class JDIVirtualMachine(
     }
 
     private fun handleJavaWizTracing(event: MethodExitEvent) {
-        val callingMethodStackDepth = event.thread().frameCount() - 1 // don't count $JavaWiz - frame
-        val callingFrame = event.thread().frame(1)
+        // don't count $JavaWiz - frames
+        var callingUserMethodFrameIndex = 0
+        while (event.thread().frame(callingUserMethodFrameIndex).location().declaringType().name() !in parseInfoByTypeNames.keys) {
+            callingUserMethodFrameIndex++
+        }
+        val callingFrame = event.thread().frame(callingUserMethodFrameIndex)
         val callingLocation = callingFrame.location()
         val parseInfo = parseInfoByTypeNames[callingLocation.declaringType().name()]!!
 
@@ -270,7 +274,7 @@ class JDIVirtualMachine(
                 val conditionValue = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("value")!!) as BooleanValue).value()
 
                 conditionTracer.addConditionValue(
-                    callingMethodStackDepth,
+                    callingUserMethodFrameIndex,
                     ConditionValue(conditionId, parseInfo.conditions[conditionId], conditionValue, evaluated = true)
                 )
             }
@@ -282,7 +286,7 @@ class JDIVirtualMachine(
                 val dimension = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("dimension")!!) as IntegerValue).value()
 
                 arrayAccessTracer.addPartialArrayAccess(
-                    callingMethodStackDepth,
+                    callingUserMethodFrameIndex,
                     parseInfo.localUri,
                     arrayAccessID,
                     indexValue = index,
@@ -365,14 +369,15 @@ class JDIVirtualMachine(
             }
 
             "traceParam" -> {
-                // TODO: implement this
+                // Already handled in traceStream, as traceStream is called from within traceParam
             }
 
             "collectAndTransformStreamOperationValues" -> {
                 streamOperationTracer.collectAndTransformStreamOperationValues()
             }
 
-            else -> error("unknown method type in class $JAVAWIZ_CLASS: ${javaWizFrame.location().method().name()}")
+            // This would fire for lambdas within the JavaWiz class
+            //else -> error("unknown method type in class $JAVAWIZ_CLASS: ${javaWizFrame.location().method().name()}")
         }
     }
 

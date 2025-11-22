@@ -130,10 +130,16 @@ class StreamOperationTracer {
                 })
                 addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "int", count, param)
             }
+            "collect",
             "toList", "toArray" -> {
+                if (lastTraceValue == null) {
+                    //addStreamOperationValue(type, "END", operationID, -1, mutableListOf(), if (type == "toList") "List" else "Array", if (type == "toList") listOf<Any>() else
+                      //  arrayOf<Any>(), param)
+                    return
+                }
                 val lastListOp = lastInOps[actualStreamID]?.get(operationID)
                 val elemID = lastListOp?.elementID ?: elementcounter.also { elementcounter++ }
-                val parentIDs = (lastListOp?.parentIDs ?: mutableListOf()).toMutableList().apply { add (lastTraceValue!!.elementID) }
+                val parentIDs = (lastListOp?.parentIDs ?: mutableListOf()).toMutableList().apply { lastTraceValue?.let { add (it.elementID) } }
                 val list = parentIDs.toMutableList()
                 val type = if (type == "toList") "List" else "Array"
                 addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, list, param)

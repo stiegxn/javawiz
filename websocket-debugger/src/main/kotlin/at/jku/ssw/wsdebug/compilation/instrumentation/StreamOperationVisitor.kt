@@ -26,17 +26,16 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
             val receiverType = meth.selected.type?.tsym.toString()
             if (isStreamType(receiverType)) {
                 val name = meth.name.toString()
+                var firstArgAsString: String = ""
                 if (name in terminalOperations) {
                     actualStreamID = ++numberOfStreams
                     openStreams.add(numberOfStreams)
                     streamOperations[actualStreamID] = mutableListOf()
-                }
-                // ToDo: Replace for all terminal operations
-                if (name == "max" || name == "min") {
+
                     if (methodInvocation.args.isNotEmpty()) {
                         hasParam = true
                         beginLine = pos.getBeginLineStreamOp(methodInvocation.args[0])
-                        beginColumn = pos.getBeginColumn(methodInvocation.args[0])
+                        beginColumn = pos.getBeginColumn(methodInvocation.args[0]) - 1
                     } else {
                         beginLine = pos.getBeginLineStreamOp(meth)
                         beginColumn = pos.getBeginColumnStreamOp(meth)
@@ -45,7 +44,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     beginLine = pos.getBeginLineStreamOp(meth)
                     beginColumn = pos.getBeginColumnStreamOp(meth)
                 }
-                var firstArgAsString: String = ""
+
                 if (methodInvocation.args.isNotEmpty()) {
                     hasParam = true
                     firstArgAsString = methodInvocation.args[0].toString()
