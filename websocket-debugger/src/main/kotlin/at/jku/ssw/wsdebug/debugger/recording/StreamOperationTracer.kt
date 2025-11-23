@@ -133,15 +133,40 @@ class StreamOperationTracer {
             "collect",
             "toList", "toArray" -> {
                 if (lastTraceValue == null) {
-                    //addStreamOperationValue(type, "END", operationID, -1, mutableListOf(), if (type == "toList") "List" else "Array", if (type == "toList") listOf<Any>() else
-                      //  arrayOf<Any>(), param)
                     return
                 }
                 val lastListOp = lastInOps[actualStreamID]?.get(operationID)
                 val elemID = lastListOp?.elementID ?: elementcounter.also { elementcounter++ }
                 val parentIDs = (lastListOp?.parentIDs ?: mutableListOf()).toMutableList().apply { lastTraceValue?.let { add (it.elementID) } }
                 val list = parentIDs.toMutableList()
-                val type = if (type == "toList") "List" else "Array"
+//                val type = if (type == "toList") "List" else "Array"
+                val type = when(type) {
+                    "toList" -> "List"
+                    "toArray" -> "Array"
+                    "collect" -> {
+                        // paramlower before first occurence of '('
+                        val paramLower = param.substringBefore('(').lowercase()
+                        when {
+                            paramLower.contains("set") -> "Set"
+                            paramLower.contains("list") -> "List"
+                            paramLower.contains("array") -> "Array"
+                            paramLower.contains("map") -> "Map"
+                            else -> "Object"
+                        }
+                    }
+                    else -> type
+                }
+                if (type == "Map") {
+                    // for map, parentIDs are pairs of key and value IDs, so we need to group them
+                    val mapEntries = mutableListOf<Pair<Int, Int>>()
+                    for (i in list.indices step 2) {
+                        if (i + 1 < list.size) {
+                            mapEntries.add(Pair(list[i], list[i + 1]))
+                        }
+                    }
+                    addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, mapEntries, param)
+                    return
+                }
                 addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, list, param)
             }
 //            "max" -> {
@@ -170,6 +195,11 @@ class StreamOperationTracer {
         }
     }
 
+    fun traceNOPEndStream(operationID: Int) {
+        val lastListOp = lastInOps[actualStreamID]?.get(operationID)!!
+        val parentIDs = lastListOp.parentIDs.toMutableList().apply { lastTraceValue?.let { add (it.elementID) } }
+        addStreamOperationValue(lastListOp.type, lastListOp.direction, lastListOp.operationID, lastListOp.elementID, parentIDs, lastListOp.valuetype, lastListOp.value, lastListOp.param)
+    }
     fun collectAndTransformStreamOperationValues(): StreamVisualizationInfo {
         visualizationObjects.reset()
         val nodes = visualizationObjects.marbles
@@ -248,7 +278,7 @@ class StreamOperationTracer {
                     parents.forEach { p -> links.add(StreamLink(p.elemId, elemId, visibleAt)) }
                 }
                 val label = when (op.valuetype) {
-                    "List", "Array" -> parents.joinToString(", ") { p -> p.elemId }
+                    "List", "Array", "Set", "Map" -> parents.joinToString(", ") { p -> p.elemId }
                     else -> op.value.toString()
                 }
                 nodes.add(StreamMarble(currentseq, elemId, x, y, op.valuetype, label, op.operationID, op.type, getMarbleColor(op), op.direction))
@@ -268,6 +298,8 @@ class StreamOperationTracer {
         when (value.type) {
             "List" -> return "#DBDBDB"
             "Array" -> return "#CCEEFF"
+            "Set" -> return "#FFDDCC"
+            "Map" -> return "#FFCCCC"
             else -> {
                 val goldenAngle = 137.508  // idealer Abstand in Grad (laut ChatGPT)
                 val hue = ((value.elementID.hashCode().absoluteValue * goldenAngle) % 360).toFloat() / 360f

@@ -222,7 +222,7 @@ function render() {
               renderStringNode(group, d);
             } else if (isSmallerType(d.valuetype)) {
               renderSmallTypeNode(group, d);
-            } else if (d.valuetype === 'List' || d.valuetype === 'Array') {
+            } else if (['List', 'Array', 'Set', 'Map'].includes(d.valuetype)) {
               renderVerticalListNode(group, d);
             } else if (d.valuetype.includes('[]')) {
               renderHorizontalListNode(group, d);
@@ -301,7 +301,7 @@ function render() {
           return src.y + height - 20;
         }
         return src.y + 20;
-      } else if (src.valuetype === 'List' || src.valuetype === 'Array' ) {
+      } else if (['List', 'Array', 'Set'].includes(src.valuetype)) {
         return src.y + 30;
       }
       const objectfieldslength = (heap.value?.find(obj => obj.id.toString() === src.label) as any).fields.length || 0;
@@ -531,12 +531,13 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
     elem.type.substring(0, elem.type.length - 2) :
     elem.type;
   if (!isSmallerType(type) && type !== 'java.lang.String') {
-    const firstElemNode = heap.value?.find(n => n.id === elems[0].value.reference) as HeapObject;
+    // find or null
+    const firstElemNode = elems.length > 0 ? heap.value?.find(n => n.id === elems[0].value.reference) as HeapObject : null;
     if (firstElemNode) {
       const fieldsLength = firstElemNode.fields.length;
       height = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
-      width = WIDTH * 2 - MARGIN;
     }
+    width = WIDTH * 2 - MARGIN;
   }
 
   group.append('rect')
@@ -600,8 +601,8 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
           const idField = fields.find(f => ['id', 'Id', 'ID'].includes(f.name));
           const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
           result = [idField, nameField].filter(Boolean);
-          fields = fields.slice(0, 4 - result.length);
           fields = fields.filter(f => f !== idField && f !== nameField);
+          fields = fields.slice(0, 3 - result.length);
           result = result.concat(fields);
           result.push({name: '...', value: {type: '...', value: '...'}});
         }
@@ -744,8 +745,8 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
           const idField = fields.find(f => ['id', 'Id', 'ID'].includes(f.name));
           const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
           result = [idField, nameField].filter(Boolean);
-          fields = fields.slice(0, 4 - result.length);
           fields = fields.filter(f => f !== idField && f !== nameField);
+          fields = fields.slice(0, 3 - result.length);
           result = result.concat(fields);
           result.push({name: '...', value: {type: '...', value: '...'}});
         }

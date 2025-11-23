@@ -299,7 +299,7 @@ class JDIVirtualMachine(
                 val direction = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("direction")!!) as StringReference).value()
                 val elemUntyped = javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!)
                 var valuetype = elemUntyped.type().name()
-                val value = when (elemUntyped) {
+                var value = when (elemUntyped) {
                     is StringReference -> elemUntyped.value()
                     // check for java.lang.Integer also
                     is IntegerValue -> elemUntyped.value()
@@ -339,6 +339,9 @@ class JDIVirtualMachine(
                                 is ShortValue -> fieldValue.value()
                                 else -> error("unknown value type for wrapper $valuetype: ${fieldValue?.type()?.name()}")
                             }
+                        } else if (valuetype.contains("Map")) {
+                            val tempval = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("value")!!) as StringReference).value()
+                            tempval
                         } else {
                             // Kein Wrapper -> normales Objekt
                             valuetype = valuetype.drop(valuetype.lastIndexOf('$') + 1)
@@ -351,11 +354,31 @@ class JDIVirtualMachine(
                 val operationId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("id")!!) as IntegerValue).value()
                 val streamId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("streamId")!!) as IntegerValue).value()
                 val param = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("param")!!) as StringReference).value()
+                if (valuetype.contains("Map")) {
+                    val tempvalue = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("value")!!) as StringReference).value()
+                    // tempvalue looks as follows -> eg. {1=[[LHelloWorld$Person;@eed1f14], 6=[[LHelloWorld$Person;@1218025c, [LHelloWorld$Person;@1218025c]}
+                    // we nee to replace the LHelloWorld$Person with the unique id of the corresponding object
+                    val regex = Regex("""\[(L[\w\$]+;)@([0-9a-f]+)""")
+                    val tempvalue2 = regex.replace(tempvalue) { matchResult ->
+                        val className = matchResult.groupValues[1].drop(1).dropLast(1)
+                        val hexId = matchResult.groupValues[2]
+                        val objectId = relevantClasses
+                            .find { it.name() == className }
+                            ?.instances(0)
+                        val objectIdFinal = objectId
+                            ?.find { it.uniqueID().toString(16) == hexId }
+                            ?.uniqueID()
+                            ?: error("could not find object with class $className and hex id $hexId")
+                        "[$objectId"
+                    }
+                    value = tempvalue2
+                }
                 when (direction) {
                     "START" -> streamOperationTracer.traceStartStream(operationName, operationId, value, valuetype, streamId)
                     "IN" -> streamOperationTracer.traceInStream(operationName, operationId, value, valuetype, streamId, param)
                     "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, value, valuetype, streamId, param)
                     "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId, param)
+                    "NOP" -> streamOperationTracer.traceNOPEndStream(operationId)
                     else -> error("unknown direction for stream element")//streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf
                 // (0), value)
                 }
