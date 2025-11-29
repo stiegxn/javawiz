@@ -112,7 +112,8 @@ class StreamOperationTracer {
         type: String,
         operationID: Int,
         streamId: Int,
-        param: String
+        param: String,
+        value: String?
     ) {
         actualStreamID = streamId
         when (type) {
@@ -158,12 +159,15 @@ class StreamOperationTracer {
                 }
                 if (type == "Map") {
                     // for map, parentIDs are pairs of key and value IDs, so we need to group them
-                    val mapEntries = mutableListOf<Pair<Int, Int>>()
-                    for (i in list.indices step 2) {
-                        if (i + 1 < list.size) {
-                            mapEntries.add(Pair(list[i], list[i + 1]))
-                        }
+                    val mapEntries = mutableListOf<Pair<String, String>>()
+                    // value is a string with json like format {key1:value1, key2:value2, ...}
+                    // transform into json
+                    val keyValuePairs = value.toString().trim().split(";").map { it.trim() }
+                    for (pair in keyValuePairs) {
+                        val (key, value) = pair.split("=").map { it.trim() }
+                        mapEntries.add(Pair(key, value))
                     }
+
                     addStreamOperationValue(type, "END", operationID, elemID, parentIDs, type, mapEntries, param)
                     return
                 }

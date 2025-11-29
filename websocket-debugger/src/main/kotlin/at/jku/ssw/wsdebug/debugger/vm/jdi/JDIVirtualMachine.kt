@@ -299,6 +299,7 @@ class JDIVirtualMachine(
                 val direction = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("direction")!!) as StringReference).value()
                 val elemUntyped = javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!)
                 var valuetype = elemUntyped.type().name()
+                var isMap = false
                 var value = when (elemUntyped) {
                     is StringReference -> elemUntyped.value()
                     // check for java.lang.Integer also
@@ -339,9 +340,6 @@ class JDIVirtualMachine(
                                 is ShortValue -> fieldValue.value()
                                 else -> error("unknown value type for wrapper $valuetype: ${fieldValue?.type()?.name()}")
                             }
-                        } else if (valuetype.contains("Map")) {
-                            val tempval = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("value")!!) as StringReference).value()
-                            tempval
                         } else {
                             // Kein Wrapper -> normales Objekt
                             valuetype = valuetype.drop(valuetype.lastIndexOf('$') + 1)
@@ -354,30 +352,123 @@ class JDIVirtualMachine(
                 val operationId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("id")!!) as IntegerValue).value()
                 val streamId = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("streamId")!!) as IntegerValue).value()
                 val param = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("param")!!) as StringReference).value()
-                if (valuetype.contains("Map")) {
-                    val tempvalue = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("value")!!) as StringReference).value()
-                    // tempvalue looks as follows -> eg. {1=[[LHelloWorld$Person;@eed1f14], 6=[[LHelloWorld$Person;@1218025c, [LHelloWorld$Person;@1218025c]}
-                    // we nee to replace the LHelloWorld$Person with the unique id of the corresponding object
-                    val regex = Regex("""\[(L[\w\$]+;)@([0-9a-f]+)""")
-                    val tempvalue2 = regex.replace(tempvalue) { matchResult ->
-                        val className = matchResult.groupValues[1].drop(1).dropLast(1)
-                        val hexId = matchResult.groupValues[2]
-                        val objectId = relevantClasses
-                            .find { it.name() == className }
-                            ?.instances(0)
-                        val objectIdFinal = objectId
-                            ?.find { it.uniqueID().toString(16) == hexId }
-                            ?.uniqueID()
-                            ?: error("could not find object with class $className and hex id $hexId")
-                        "[$objectId"
+                if (valuetype.contains("Map") && elemUntyped is ObjectReference) {
+                    isMap = true
+                    val previouslyEnabledEventRequests = nativeVM.getEnabledRequests()
+                    previouslyEnabledEventRequests.forEach { it.disable() }
+
+                    try {
+                        val thread = event.thread()
+                        val mapRef = elemUntyped
+
+                        // Helper: Formats a single element (String literal or UniqueID)
+                        fun formatElement(elem: Value?): String {
+                            return when (elem) {
+                                is StringReference -> "\"${elem.value()}\""
+                                is ObjectReference -> elem.uniqueID().toString()
+                                else -> elem?.toString() ?: "null"
+                            }
+                        }
+
+                        // Helper: Inspects the value type to handle Arrays, Lists, or Objects
+                        fun formatValue(v: Value?): String {
+                            if (v == null) return "null"
+
+                            // Case A: It's a native Array (String[], Object[], etc.)
+                            if (v is ArrayReference) {
+                                return v.values.joinToString(prefix = "[", postfix = "]", transform = ::formatElement)
+                            }
+
+                            // Case B: It's an Object (check if it is a List)
+                            if (v is ObjectReference) {
+                                val type = v.referenceType()
+
+                                // Check if class implements java.util.List
+                                val isList = (type as? ClassType)?.allInterfaces()?.any { it.name() == "java.util.List" } == true
+
+                                if (isList) {
+                                    // Invoke toArray() to simplify data extraction
+                                    val toArrayMethod = type.methodsByName("toArray").find { it.argumentTypeNames().isEmpty() }
+                                    if (toArrayMethod != null) {
+                                        val listAsArray = v.invokeMethod(thread, toArrayMethod, emptyList(), ObjectReference.INVOKE_SINGLE_THREADED) as? ArrayReference
+                                        if (listAsArray != null) {
+                                            return listAsArray.values.joinToString(prefix = "[", postfix = "]", transform = ::formatElement)
+                                        }
+                                    }
+                                }
+
+                                // Case C: It's a standard Object or String
+                                return formatElement(v)
+                            }
+
+                            // Case D: Primitives
+                            return v.toString()
+                        }
+
+                        // 2. Get entrySet() from the Map
+                        val entrySetMethod = mapRef.referenceType().methodsByName("entrySet").firstOrNull()
+                        val entrySet = if (entrySetMethod != null) {
+                            mapRef.invokeMethod(thread, entrySetMethod, emptyList(), ObjectReference.INVOKE_SINGLE_THREADED) as? ObjectReference
+                        } else null
+
+                        if (entrySet != null) {
+                            // 3. Get toArray() from the EntrySet
+                            val toArrayMethod = entrySet.referenceType().methodsByName("toArray").find { it.argumentTypeNames().isEmpty() }
+
+                            if (toArrayMethod != null) {
+                                val entriesArray = entrySet.invokeMethod(thread, toArrayMethod, emptyList(), ObjectReference.INVOKE_SINGLE_THREADED) as? ArrayReference
+
+                                val mapBuilder = StringBuilder()
+
+                                entriesArray?.values?.forEachIndexed { index, entryValue ->
+                                    if (entryValue is ObjectReference) {
+                                        val entryType = entryValue.referenceType()
+                                        // Get Key and Value from Map.Entry
+                                        val getKeyMethod = entryType.methodsByName("getKey").first()
+                                        val getValueMethod = entryType.methodsByName("getValue").first()
+
+                                        val keyRef = entryValue.invokeMethod(thread, getKeyMethod, emptyList(), ObjectReference.INVOKE_SINGLE_THREADED)
+                                        val valueRef = entryValue.invokeMethod(thread, getValueMethod, emptyList(), ObjectReference.INVOKE_SINGLE_THREADED)
+
+                                        // Format Key (String representation)
+                                        val keyStr = when (keyRef) {
+                                            is StringReference -> "\"${keyRef.value()}\""
+                                            is ObjectReference -> {
+                                                // Try invoking toString() on the key object
+                                                val toStringMethod = keyRef.referenceType().methodsByName("toString").find { it.argumentTypeNames().isEmpty() }
+                                                if (toStringMethod != null) {
+                                                    (keyRef.invokeMethod(thread, toStringMethod, emptyList(), ObjectReference.INVOKE_SINGLE_THREADED) as? StringReference)?.value() ?: keyRef.uniqueID().toString()
+                                                } else {
+                                                    keyRef.uniqueID().toString()
+                                                }
+                                            }
+                                            else -> keyRef?.toString() ?: "null"
+                                        }
+
+                                        // Format Value (Recursively check for List/Array)
+                                        val valStr = formatValue(valueRef)
+
+                                        if (index > 0) mapBuilder.append("; ")
+                                        mapBuilder.append("$keyStr=$valStr")
+                                    }
+                                }
+                                value = mapBuilder.toString()
+                                println("Inspected Map entries via JDI: $value")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        println("Failed to inspect Map entries via JDI: ${e.message}")
+                        value = "Map(Error: ${e.message})"
+                    } finally {
+                        // 4. Re-enable event requests
+                        previouslyEnabledEventRequests.forEach { it.enable() }
                     }
-                    value = tempvalue2
                 }
                 when (direction) {
                     "START" -> streamOperationTracer.traceStartStream(operationName, operationId, value, valuetype, streamId)
                     "IN" -> streamOperationTracer.traceInStream(operationName, operationId, value, valuetype, streamId, param)
                     "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, value, valuetype, streamId, param)
-                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId, param)
+                    "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId, param, if(isMap) value.toString() else null)
                     "NOP" -> streamOperationTracer.traceNOPEndStream(operationId)
                     else -> error("unknown direction for stream element")//streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf
                 // (0), value)
