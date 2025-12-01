@@ -125,6 +125,7 @@ let zoom = d3.zoom()
 let lastNodeX: number;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let animationSpeed = 800;
+let mapKeys: string[][];
 
 // Hilfsfunktion: Für jede ID nur den neuesten Knoten (max step <= currentStep) auswählen
 function getVisibleNodesAtStep(nodes: any, step: number) {
@@ -608,6 +609,7 @@ function renderVerticalListNode(group: d3.Selection<SVGGElement, any, any, any>,
   }
 
   group.insert('rect', ':first-child')
+    .attr('id', 'list-node')
     .attr('x', -HALFWIDTH - MARGIN)
     .attr('y', -RADIUS - 5)
     .attr('width', width)
@@ -775,40 +777,48 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
 }
 
 function renderMapNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) {
-  let refpairs = d.label.substring(2, d.label.length - 2).split('), (');
-  let length = refpairs.length;
-  let isList = refpairs[0].includes('[') && refpairs[0].includes(']');
+  let length = 0;
   let keys: string[] = [];
   let values: string[] = [];
-  for (let i = 0; i < length; i++) {
-    let pair = refpairs[i];
-    if (isList) {
-      pair = pair.replace('[', '').replace(']', '');
-    }
-    const idx = pair.indexOf(', ');
-    if (idx >= 0) {
-      keys.push(pair.substring(0, idx));
-      values.push(pair.substring(idx + 2));
-    } else {
-      keys.push(pair);
-      values.push('');
+  if (d.mapKeys) {
+    keys = d.mapKeys;
+    values = d.mapValues;
+    length = d.mapKeys.length;
+  }
+  if (length === 0) {
+    let refpairs = d.label.substring(2, d.label.length - 2).split('), (');
+    length = refpairs.length;
+    let isList = refpairs[0].includes('[') && refpairs[0].includes(']');
+    for (let i = 0; i < length; i++) {
+      let pair = refpairs[i];
+      if (isList) {
+        pair = pair.replace('[', '').replace(']', '');
+      }
+      const idx = pair.indexOf(', ');
+      if (idx >= 0) {
+        keys.push(pair.substring(0, idx));
+        values.push(pair.substring(idx + 2));
+      } else {
+        keys.push(pair);
+        values.push('');
+      }
     }
   }
-  let firstElem = heap.value?.find((n: any) => n.id.toString() === values[0].split(', ')[0].trim()) as any;
-  let typeOfElements = firstElem?.type || 'Unknown';
-  // if (typeOfElements.endsWith('[]')) {
-  //   typeOfElements = typeOfElements.substring(0, typeOfElements.length - 2);
+  // let firstElem = heap.value?.find((n: any) => n.id.toString() === values[0].split(', ')[0].trim()) as any;
+  // let typeOfElements = firstElem?.type || 'Unknown';
+  // // if (typeOfElements.endsWith('[]')) {
+  // //   typeOfElements = typeOfElements.substring(0, typeOfElements.length - 2);
+  // // }
+  // let elemHeight = (RADIUS + 5) * 2 + MARGIN;
+  // if (!isSmallerType(typeOfElements) && typeOfElements !== 'java.lang.String') {
+  //   const elem = heap.value?.find(obj => obj.id.toString() === (heap.value
+  //     ?.find(o => o.id.toString() === firstElem.label) as any)
+  //     ?.elements?.[0]?.value?.reference) as HeapObject;
+  //   if (elem) {
+  //     const fieldsLength = elem.fields.length;
+  //     elemHeight = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
+  //   }
   // }
-  let elemHeight = (RADIUS + 5) * 2 + MARGIN;
-  if (!isSmallerType(typeOfElements) && typeOfElements !== 'java.lang.String') {
-    const elem = heap.value?.find(obj => obj.id.toString() === (heap.value
-      ?.find(o => o.id.toString() === firstElem.label) as any)
-      ?.elements?.[0]?.value?.reference) as HeapObject;
-    if (elem) {
-      const fieldsLength = elem.fields.length;
-      elemHeight = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
-    }
-  }
 
   const subGroup = group.append('g');
 
@@ -822,36 +832,30 @@ function renderMapNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) 
       return foundNode ? foundNode.elemId.toString() : '';
     }).join(', ');
     d.label = newLabelString;
+
     const elemGroup = subGroup.append('g')
       .attr('transform', `translate(0, ${heightOffset})`);
     renderVerticalListNode(elemGroup, d);
-    
+
     const bbox = subGroup.node()?.getBBox();
     if (bbox) {
       maxWidth = Math.max(maxWidth, bbox.width);
       heightOffset = bbox.height;
     }
-    // set rect of elemGroup to maxWidth
-    elemGroup.select('rect')
-      .attr('width', maxWidth);
+    // ToDo: set rect with key in front of elemGroup
+    elemGroup.append('rect')
+    .attr('heigt', RADIUS)
+        .attr('width', RADIUS)
+        .attr('fill', d.color);
+    elemGroup.append('text')
+        .text(keys[i])
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle');
   }
-
-  group.append('rect')
-    .attr('x', -HALFWIDTH)
-    .attr('y', -RADIUS - 5)
-    .attr('width', WIDTH)
-    .attr('height', (RADIUS + 5) * 2)
-    .attr('rx', 5)
-    .attr('ry', 5)
-    .attr('stroke', '#333')
-    .attr('stroke-width', 1.5)
-    .attr('fill', d.color || '#cceeff');
-
-  group.append('text')
-    .text(d.valuetype)
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'middle')
-    .attr('font-size', '16px');
+  subGroup.selectAll('#list-node')
+    .attr('width', maxWidth);
+  d.mapKeys = keys;
+  d.mapValues = values;
 }
 
 function stepForwards() {
