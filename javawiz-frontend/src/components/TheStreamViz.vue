@@ -61,7 +61,7 @@ import NavigationBarWithSettings from '@/components/NavigationBarWithSettings.vu
 import {STREAMVIZ} from '@/store/PaneVisibilityStore'
 import { useGeneralStore } from '@/store/GeneralStore'
 import * as d3 from 'd3'
-import type {HeapArray, HeapObject, HeapString} from '@/dto/TraceState';
+import type {HeapObject, HeapString} from '@/dto/TraceState';
 
 defineComponent({
   name: 'TheStreamViz',
@@ -217,13 +217,14 @@ function render() {
               .attr('stroke-width', 2)
               .attr('stroke-linecap', 'round');
           } else {
-            // check if d.valuetype contains []
             if (d.valuetype === 'java.lang.String') {
               renderStringNode(group, d);
             } else if (isSmallerType(d.valuetype)) {
               renderSmallTypeNode(group, d);
-            } else if (['List', 'Array', 'Set', 'Map'].includes(d.valuetype)) {
+            } else if (['List', 'Array', 'Set'].includes(d.valuetype)) {
               renderVerticalListNode(group, d);
+            } else if (d.valuetype === 'Map') {
+              renderMapNode(group, d);
             } else if (d.valuetype.includes('[]')) {
               renderHorizontalListNode(group, d);
             } else {
@@ -461,6 +462,108 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
   }
 }
 
+function renderMiniCircleNode(
+  group: d3.Selection<SVGGElement, any, any, any>,
+  fontsize: string,
+  label: string,
+  circlewidth: number
+) {
+  group.append('circle')
+    .attr('cx', circlewidth)
+    .attr('r', RADIUS - 1)
+    .attr('stroke', '#333')
+    .attr('stroke-width', 1.5)
+    .attr('fill', '#f0f0f0');
+  group.append('text')
+    .text(label)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'middle')
+    .attr('x', circlewidth)
+    .attr('font-size', fontsize);
+}
+
+function renderMiniObjectNode(
+  group: d3.Selection<SVGGElement, any, any, any>,
+  elemNode: any,
+  d: any,
+  rectWidth: number,
+  xPos: number
+) {
+  let fields = (elemNode as HeapObject)?.fields || [];
+  let result: any = fields;
+
+  if (fields.length > 3) {
+    const idField = fields.find(f => ['id', 'Id', 'ID'].includes(f.name));
+    const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
+
+    result = [idField, nameField].filter(Boolean);
+    fields = fields.filter(f => f !== idField && f !== nameField);
+    fields = fields.slice(0, 3 - result.length);
+    result = result.concat(fields);
+    result.push({ name: '...', value: { type: '...', value: '...' }});
+  }
+
+  group.append('rect')
+    .attr('x', xPos)
+    .attr('y', -RADIUS)
+    .attr('width', rectWidth)
+    .attr('height', RADIUS * 2 - 5)
+    .attr('rx', 2)
+    .attr('ry', 2)
+    .attr('stroke', '#333')
+    .attr('stroke-width', 1.5)
+    .attr('fill', '#d0d0d0');
+
+  group.append('text')
+    .text(d.valuetype.substring(0, d.valuetype.length - 2))
+    .attr('x', xPos + rectWidth / 2)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'middle')
+    .attr('font-size', '12px');
+
+  for (let i = 0; i < result.length; i++) {
+    const field = result[i];
+    const isEllipsis = field.name === '...';
+    const height = isEllipsis ? RADIUS : (RADIUS + 5) + 10;
+
+    group.append('rect')
+      .attr('x', xPos)
+      .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
+      .attr('width', rectWidth)
+      .attr('height', height)
+      .attr('rx', 2)
+      .attr('ry', 2)
+      .attr('stroke', '#333')
+      .attr('stroke-width', 1.5)
+      .attr('fill', '#f9f9f9');
+
+    group.append('text')
+      .text(() => {
+        const object = field.value;
+
+        if (object.reference) {
+          let refobject = heap.value?.find(obj => obj.id === object.reference);
+          let t = (refobject as any)?.string;
+
+          if (!t) {
+            let type = refobject!.type;
+            t = type.substring(type.lastIndexOf('.') + 1);
+          }
+          if (t.length > 10) t = t.substring(0, 10) + '...';
+          return t;
+        }
+        if (object.primitiveValue) return object.primitiveValue;
+        if (object.value) return object.value;
+        return '';
+      })
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .attr('y', isEllipsis ? height * 7 : height * (i + 1))
+      .attr('x', xPos + rectWidth / 2)
+      .attr('font-size', '12px');
+  }
+}
+
 function renderVerticalListNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) {
   let labelAsList = d.label.split(',');
   let length = labelAsList.length;
@@ -554,18 +657,10 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
   for (let i = 0; i < length; i++) {
     let elemNode = heap.value?.find(n => n.id === elems[i].value.reference) as any;
     if (!elemNode) {
-      group.append('circle')
-        .attr('cx', -HALFWIDTH + i * (width / length) + (width / length) / 2)
-        .attr('r', RADIUS - 1)
-        .attr('stroke', '#333')
-        .attr('stroke-width', 1.5)
-        .attr('fill', '#f0f0f0');
-      group.append('text')
-        .text(elems[i].value.primitiveValue)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .attr('x', -HALFWIDTH + i * (width / length) + (width / length) / 2)
-        .attr('font-size', miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px');
+      let circlewidth = -HALFWIDTH + i * (width / length) + (width / length) / 2;
+      let fontsize = miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px';
+      let label = elems[i].value.primitiveValue;
+      renderMiniCircleNode(group, fontsize, label, circlewidth);
     } else {
       console.log('Rendering element node inside horizontal list:');
       console.log(elemNode);
@@ -595,86 +690,11 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
           .attr('x', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2)
           .attr('font-size', '9px');
       } else {
-        var fields = (elemNode as HeapObject)?.fields || [];
-        var result: any = fields;
-        if (fields.length > 3) {
-          const idField = fields.find(f => ['id', 'Id', 'ID'].includes(f.name));
-          const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
-          result = [idField, nameField].filter(Boolean);
-          fields = fields.filter(f => f !== idField && f !== nameField);
-          fields = fields.slice(0, 3 - result.length);
-          result = result.concat(fields);
-          result.push({name: '...', value: {type: '...', value: '...'}});
-        }
-
         const rectWidth = HALFWIDTH - MARGIN * 2;
         const minGap = 2;
         const gap = (width - 2 * minGap - length * rectWidth) / (length + 1);
         const xPos = -HALFWIDTH + minGap + gap + i * (rectWidth + gap);
-
-        group.append('rect')
-          .attr('x', xPos)
-          .attr('y', -RADIUS)
-          .attr('width', rectWidth)
-          .attr('height', (RADIUS) * 2 - 5)
-          .attr('rx', 2)
-          .attr('ry', 2)
-          .attr('stroke', '#333')
-          .attr('stroke-width', 1.5)
-          .attr('fill', '#d0d0d0');
-
-        group.append('text')
-          .text(d.valuetype.substring(0, d.valuetype.length - 2))
-          .attr('x', xPos + rectWidth / 2)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .attr('font-size', '12px');
-
-        for (let i = 0; i < result.length; i++) {
-          const isEllipsis = result[i].name === '...';
-          const height = isEllipsis ? RADIUS : (RADIUS + 5) + 10;
-          group.append('rect')
-            .attr('x', xPos)
-            .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
-            .attr('width', rectWidth)
-            .attr('height', height)
-            .attr('rx', 2)
-            .attr('ry', 2)
-            .attr('stroke', '#333')
-            .attr('stroke-width', 1.5)
-            .attr('fill', '#f9f9f9');
-
-          group.append('text')
-            .text(() => {
-              const object = result[i].value;
-              console.log('Heap:');
-              console.log(heap.value);
-              if (object.reference) {
-                let refobject = heap.value?.find(obj => obj.id === object.reference) as HeapString;
-                let t = refobject?.string;
-
-                if (!t) {
-                  let type = refobject.type;
-                  t = type.substring(type.lastIndexOf('.') + 1, type.length);
-                }
-                if (t.length > 10) {
-                  t = t.substring(0, 10) + '...';
-                }
-
-                return t;
-              } else if (object.primitiveValue) {
-                return object.primitiveValue;
-              } else if (object.value) {
-                return object.value;
-              }
-              return '';
-            })
-            .attr('text-anchor', 'middle')
-            .attr('dominant-baseline', 'middle')
-            .attr('y', isEllipsis ? height * 7 : height * (i + 1))
-            .attr('x', xPos + rectWidth / 2)
-            .attr('font-size', '12px');
-        }
+        renderMiniObjectNode(group, elemNode, d, rectWidth, xPos);
       }
     }
   }
@@ -691,18 +711,9 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
     let elemNode = heap.value?.find(n => n.id === elems[i].value.reference) as any;
     if (!elemNode) {
       const cx = -HALFWIDTH + (i + 1) * RADIUS * 2 - RADIUS;
-      group.append('circle')
-        .attr('cx', cx)
-        .attr('r', RADIUS - 1)
-        .attr('stroke', '#333')
-        .attr('stroke-width', 1.5)
-        .attr('fill', '#f0f0f0');
-      group.append('text')
-        .text(elems[i].value.primitiveValue)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .attr('x', cx)
-        .attr('font-size', miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px');
+      let fontsize = miniCircleFontSize.get(elems[i].value.primitiveValue.toString().length) || '10px';
+      let label = elems[i].value.primitiveValue;
+      renderMiniCircleNode(group, fontsize, label, cx);
     } else {
       if (elemNode.type === 'java.lang.String') {
         const label = elemNode.label || elemNode.string;
@@ -739,84 +750,9 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
         tempText.remove();
         stringlength += rectWidth;
       } else {
-        var fields = (elemNode as HeapObject)?.fields || [];
-        var result: any = fields;
-        if (fields.length > 3) {
-          const idField = fields.find(f => ['id', 'Id', 'ID'].includes(f.name));
-          const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
-          result = [idField, nameField].filter(Boolean);
-          fields = fields.filter(f => f !== idField && f !== nameField);
-          fields = fields.slice(0, 3 - result.length);
-          result = result.concat(fields);
-          result.push({name: '...', value: {type: '...', value: '...'}});
-        }
-
         const rectWidth = HALFWIDTH - MARGIN * 2;
         const xPos = -HALFWIDTH + rectWidth * i + MARGIN/2;
-
-        group.append('rect')
-          .attr('x', xPos)
-          .attr('y', -RADIUS)
-          .attr('width', rectWidth)
-          .attr('height', (RADIUS) * 2 - 5)
-          .attr('rx', 2)
-          .attr('ry', 2)
-          .attr('stroke', '#333')
-          .attr('stroke-width', 1.5)
-          .attr('fill', '#d0d0d0');
-
-        group.append('text')
-          .text(d.valuetype.substring(0, d.valuetype.length - 2))
-          .attr('x', xPos + rectWidth / 2)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .attr('font-size', '12px');
-
-        for (let i = 0; i < result.length; i++) {
-          const isEllipsis = result[i].name === '...';
-          const height = isEllipsis ? RADIUS : (RADIUS + 5) + 10;
-          group.append('rect')
-            .attr('x', xPos)
-            .attr('y', 10 * (i + 1) + i * (RADIUS + 5))
-            .attr('width', rectWidth)
-            .attr('height', height)
-            .attr('rx', 2)
-            .attr('ry', 2)
-            .attr('stroke', '#333')
-            .attr('stroke-width', 1.5)
-            .attr('fill', '#f9f9f9');
-
-          group.append('text')
-            .text(() => {
-              const object = result[i].value;
-              console.log('Heap:');
-              console.log(heap.value);
-              if (object.reference) {
-                let refobject = heap.value?.find(obj => obj.id === object.reference) as HeapString;
-                let t = refobject?.string;
-
-                if (!t) {
-                  let type = refobject.type;
-                  t = type.substring(type.lastIndexOf('.') + 1, type.length);
-                }
-                if (t.length > 10) {
-                  t = t.substring(0, 10) + '...';
-                }
-
-                return t;
-              } else if (object.primitiveValue) {
-                return object.primitiveValue;
-              } else if (object.value) {
-                return object.value;
-              }
-              return '';
-            })
-            .attr('text-anchor', 'middle')
-            .attr('dominant-baseline', 'middle')
-            .attr('y', isEllipsis ? height * 7 : height * (i + 1))
-            .attr('x', xPos + rectWidth / 2)
-            .attr('font-size', '12px');
-        }
+        renderMiniObjectNode(group, elemNode, d, rectWidth, xPos);
       }
     }
   }
@@ -836,6 +772,86 @@ function renderHorizontalListTerminalNode(group: d3.Selection<SVGGElement, any, 
     .attr('stroke-width', 1.5)
     .attr('fill', d.color);
 
+}
+
+function renderMapNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) {
+  let refpairs = d.label.substring(2, d.label.length - 2).split('), (');
+  let length = refpairs.length;
+  let isList = refpairs[0].includes('[') && refpairs[0].includes(']');
+  let keys: string[] = [];
+  let values: string[] = [];
+  for (let i = 0; i < length; i++) {
+    let pair = refpairs[i];
+    if (isList) {
+      pair = pair.replace('[', '').replace(']', '');
+    }
+    const idx = pair.indexOf(', ');
+    if (idx >= 0) {
+      keys.push(pair.substring(0, idx));
+      values.push(pair.substring(idx + 2));
+    } else {
+      keys.push(pair);
+      values.push('');
+    }
+  }
+  let firstElem = heap.value?.find((n: any) => n.id.toString() === values[0].split(', ')[0].trim()) as any;
+  let typeOfElements = firstElem?.type || 'Unknown';
+  // if (typeOfElements.endsWith('[]')) {
+  //   typeOfElements = typeOfElements.substring(0, typeOfElements.length - 2);
+  // }
+  let elemHeight = (RADIUS + 5) * 2 + MARGIN;
+  if (!isSmallerType(typeOfElements) && typeOfElements !== 'java.lang.String') {
+    const elem = heap.value?.find(obj => obj.id.toString() === (heap.value
+      ?.find(o => o.id.toString() === firstElem.label) as any)
+      ?.elements?.[0]?.value?.reference) as HeapObject;
+    if (elem) {
+      const fieldsLength = elem.fields.length;
+      elemHeight = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
+    }
+  }
+
+  const subGroup = group.append('g');
+
+  let heightOffset = 0;
+  let maxWidth = 0;
+
+  for (let i = 0; i < length; i++) {
+    let tempval = values[i].split(',');
+    let newLabelString = tempval.map((v: string) => {
+      let foundNode = allNodes.value.find((n: any) => n.label.toString() === v.trim());
+      return foundNode ? foundNode.elemId.toString() : '';
+    }).join(', ');
+    d.label = newLabelString;
+    const elemGroup = subGroup.append('g')
+      .attr('transform', `translate(0, ${heightOffset})`);
+    renderVerticalListNode(elemGroup, d);
+    
+    const bbox = subGroup.node()?.getBBox();
+    if (bbox) {
+      maxWidth = Math.max(maxWidth, bbox.width);
+      heightOffset = bbox.height;
+    }
+    // set rect of elemGroup to maxWidth
+    elemGroup.select('rect')
+      .attr('width', maxWidth);
+  }
+
+  group.append('rect')
+    .attr('x', -HALFWIDTH)
+    .attr('y', -RADIUS - 5)
+    .attr('width', WIDTH)
+    .attr('height', (RADIUS + 5) * 2)
+    .attr('rx', 5)
+    .attr('ry', 5)
+    .attr('stroke', '#333')
+    .attr('stroke-width', 1.5)
+    .attr('fill', d.color || '#cceeff');
+
+  group.append('text')
+    .text(d.valuetype)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'middle')
+    .attr('font-size', '16px');
 }
 
 function stepForwards() {

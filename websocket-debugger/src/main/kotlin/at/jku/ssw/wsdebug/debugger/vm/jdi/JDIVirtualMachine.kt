@@ -364,8 +364,8 @@ class JDIVirtualMachine(
                         // Helper: Formats a single element (String literal or UniqueID)
                         fun formatElement(elem: Value?): String {
                             return when (elem) {
-                                is StringReference -> "\"${elem.value()}\""
-                                is ObjectReference -> elem.uniqueID().toString()
+                                is StringReference -> "${elem.uniqueID()}"
+                                is ObjectReference -> "${elem.uniqueID()}"
                                 else -> elem?.toString() ?: "null"
                             }
                         }
@@ -376,7 +376,8 @@ class JDIVirtualMachine(
 
                             // Case A: It's a native Array (String[], Object[], etc.)
                             if (v is ArrayReference) {
-                                return v.values.joinToString(prefix = "[", postfix = "]", transform = ::formatElement)
+                                return "REF${v.uniqueID()}"
+                                //return v.values.joinToString(prefix = "[", postfix = "]", transform = ::formatElement)
                             }
 
                             // Case B: It's an Object (check if it is a List)
@@ -460,7 +461,6 @@ class JDIVirtualMachine(
                         println("Failed to inspect Map entries via JDI: ${e.message}")
                         value = "Map(Error: ${e.message})"
                     } finally {
-                        // 4. Re-enable event requests
                         previouslyEnabledEventRequests.forEach { it.enable() }
                     }
                 }

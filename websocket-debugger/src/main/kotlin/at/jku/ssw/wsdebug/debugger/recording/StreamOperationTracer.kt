@@ -282,7 +282,8 @@ class StreamOperationTracer {
                     parents.forEach { p -> links.add(StreamLink(p.elemId, elemId, visibleAt)) }
                 }
                 val label = when (op.valuetype) {
-                    "List", "Array", "Set", "Map" -> parents.joinToString(", ") { p -> p.elemId }
+                    "List", "Array", "Set" -> parents.joinToString(", ") { p -> p.elemId }
+                    "Map" -> op.value.toString()
                     else -> op.value.toString()
                 }
                 nodes.add(StreamMarble(currentseq, elemId, x, y, op.valuetype, label, op.operationID, op.type, getMarbleColor(op), op.direction))
