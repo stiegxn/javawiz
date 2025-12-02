@@ -301,10 +301,10 @@ class StreamOperationTracer {
     private fun getMarbleColor(value: StreamOperationValue): String {
         if (value.direction == "IN") return "#FFFFFF"
         when (value.type) {
-            "List" -> return "#DBDBDB"
-            "Array" -> return "#CCEEFF"
-            "Set" -> return "#FFDDCC"
-            "Map" -> return "#FFCCCC"
+            "List" -> return "#DBDBDB" // light gray
+            "Array" -> return "#CCEEFF" // light blue
+            "Set" -> return "#FFDDCC" // light orange
+            "Map" -> return "#FFFCCC" // light yellow
             else -> {
                 val goldenAngle = 137.508  // idealer Abstand in Grad (laut ChatGPT)
                 val hue = ((value.elementID.hashCode().absoluteValue * goldenAngle) % 360).toFloat() / 360f

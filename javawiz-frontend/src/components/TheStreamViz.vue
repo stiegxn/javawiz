@@ -77,6 +77,8 @@ const RADIUS = 15;
 const HALFWIDTH = 75;
 const WIDTH = 150;
 const MARGIN = 10;
+const MAPKEYX = -145;
+const MAPKEYBOXWIDTH = 60;
 const isPlaying = ref(false);
 const currentStep = ref(0);
 const editMode = ref(false);
@@ -842,15 +844,26 @@ function renderMapNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) 
       maxWidth = Math.max(maxWidth, bbox.width);
       heightOffset = bbox.height;
     }
+    const elembbox = elemGroup.node()?.getBBox();
+    let elemHeight = elembbox ? elembbox.height : 0;
     // ToDo: set rect with key in front of elemGroup
     elemGroup.append('rect')
-    .attr('heigt', RADIUS)
-        .attr('width', RADIUS)
-        .attr('fill', d.color);
+      .attr('height', elemHeight)
+      .attr('width', MAPKEYBOXWIDTH)
+      .attr('fill', d.color)
+      .attr('x', MAPKEYX)
+      .attr('y', -RADIUS - 5)
+      .attr('rx', 5)
+      .attr('ry', 5)
+      .attr('stroke', '#333')
+      .attr('stroke-width', 1.5);
     elemGroup.append('text')
-        .text(keys[i])
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle');
+      .text(keys[i])
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .attr('x', MAPKEYX + MAPKEYBOXWIDTH / 2)
+      .attr('y', elemHeight / 2 - RADIUS - 5)
+      .attr('font-size', '16px');
   }
   subGroup.selectAll('#list-node')
     .attr('width', maxWidth);
