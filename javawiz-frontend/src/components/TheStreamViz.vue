@@ -59,7 +59,7 @@
 import {computed, defineComponent, nextTick, onUnmounted, ref, watch} from 'vue'
 import NavigationBarWithSettings from '@/components/NavigationBarWithSettings.vue'
 import {STREAMVIZ} from '@/store/PaneVisibilityStore'
-import { useGeneralStore } from '@/store/GeneralStore'
+import {useGeneralStore} from '@/store/GeneralStore'
 import * as d3 from 'd3'
 import type {HeapObject, HeapString} from '@/dto/TraceState';
 
@@ -116,6 +116,22 @@ const miniStringLength = new Map<number, number>([
   [3, 5],
   [4, 4]
 ]);
+
+const stringFontSize = new Map<number, string>([
+    [1, '16px'],
+    [2, '16px'],
+    [3, '16px'],
+    [4, '16px'],
+    [5, '16px'],
+    [6, '16px'],
+    [7, '16px'],
+    [8, '15px'],
+    [9, '15px'],
+    [10, '14px'],
+    [11, '14px'],
+    [12, '13px'],
+    [13, '13px']
+])
 
 let svg: any;
 let container: d3.Selection<SVGGElement, unknown, any, undefined>;
@@ -374,9 +390,10 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
     // search for field with name "name", "Name", "title" or "Title"
     const idField = fields.find(f => ['id', 'Id', 'ID'].includes(f.name));
     const nameField = fields.find(f => ['name', 'Name', 'title', 'Title'].includes(f.name));
+
     result = [idField, nameField].filter(Boolean);
-    fields = fields.slice(0, 4 - result.length);
     fields = fields.filter(f => f !== idField && f !== nameField);
+    fields = fields.slice(0, 3 - result.length);
     result = result.concat(fields);
     result.push({name: '...', value: {type: '...', value: '...'}});
   }
@@ -412,13 +429,15 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
       .attr('fill', d3.color(d.color)?.copy({opacity: 0.2})
         ?.toString() || d.color);
 
+    let tempval = result[i].name;
+    let templength = tempval.length;
     group.append('text')
-      .text(() => result[i].name)
+      .text(tempval)
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .attr('y', isEllipsis ? height * 7 : height * (i + 1))
       .attr('x', -HALFWIDTH / 2)
-      .attr('font-size', '16px');
+      .attr('font-size', stringFontSize.get(templength) || '12px');
 
     group.append('rect')
       .attr('x', 0)
@@ -448,11 +467,13 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
           if (t.length > 10) {
             t = t.substring(0, 10) + '...';
           }
-          
+          templength = t.length;
           return t;
         } else if (object.primitiveValue) {
+          templength = object.primitiveValue.toString().length;
           return object.primitiveValue;
         } else if (object.value) {
+          templength = object.value.toString().length;
           return object.value;
         }
         return '';
@@ -461,7 +482,7 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
       .attr('dominant-baseline', 'middle')
       .attr('y', isEllipsis ? height * 7 : height * (i + 1))
       .attr('x', HALFWIDTH / 2)
-      .attr('font-size', '16px');
+      .attr('font-size', stringFontSize.get(templength) || '12px');
   }
 }
 
@@ -577,9 +598,10 @@ function renderVerticalListNode(group: d3.Selection<SVGGElement, any, any, any>,
   }
   let elemHeight = (RADIUS + 5) * 2 + MARGIN;
   if (!isSmallerType(typeOfElements) && typeOfElements !== 'java.lang.String') {
-    const elem = heap.value?.find(obj => obj.id === (heap.value
-      ?.find(o => o.id.toString() === firstElem.label) as any)
-      ?.elements?.[0]?.value?.reference) as HeapObject;
+    let elem = heap.value?.find(o => o.id.toString() === firstElem.label) as any;
+    if (elem.type.includes('[]')) {
+      elem = heap.value?.find(obj => obj.id === elem?.elements?.[0]?.value?.reference) as HeapObject;
+    }
     if (elem) {
       const fieldsLength = elem.fields.length;
       elemHeight = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
@@ -806,21 +828,6 @@ function renderMapNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) 
       }
     }
   }
-  // let firstElem = heap.value?.find((n: any) => n.id.toString() === values[0].split(', ')[0].trim()) as any;
-  // let typeOfElements = firstElem?.type || 'Unknown';
-  // // if (typeOfElements.endsWith('[]')) {
-  // //   typeOfElements = typeOfElements.substring(0, typeOfElements.length - 2);
-  // // }
-  // let elemHeight = (RADIUS + 5) * 2 + MARGIN;
-  // if (!isSmallerType(typeOfElements) && typeOfElements !== 'java.lang.String') {
-  //   const elem = heap.value?.find(obj => obj.id.toString() === (heap.value
-  //     ?.find(o => o.id.toString() === firstElem.label) as any)
-  //     ?.elements?.[0]?.value?.reference) as HeapObject;
-  //   if (elem) {
-  //     const fieldsLength = elem.fields.length;
-  //     elemHeight = Math.min(fieldsLength, 3) * (RADIUS + 5) * 2 + MARGIN * 2;
-  //   }
-  // }
 
   const subGroup = group.append('g');
 
@@ -829,11 +836,10 @@ function renderMapNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) 
 
   for (let i = 0; i < length; i++) {
     let tempval = values[i].split(',');
-    let newLabelString = tempval.map((v: string) => {
+    d.label = tempval.map((v: string) => {
       let foundNode = allNodes.value.find((n: any) => n.label.toString() === v.trim());
       return foundNode ? foundNode.elemId.toString() : '';
     }).join(', ');
-    d.label = newLabelString;
 
     const elemGroup = subGroup.append('g')
       .attr('transform', `translate(0, ${heightOffset})`);
