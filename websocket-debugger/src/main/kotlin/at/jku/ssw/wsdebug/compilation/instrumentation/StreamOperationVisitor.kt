@@ -19,13 +19,44 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
             return
         }
         val meth = methodInvocation.meth
-        if (meth is JCTree.JCFieldAccess) {
+        var receiverType = ""
+        var name = ""
+        val isVisitableMethod: Boolean = when (meth) {
+            is JCTree.JCFieldAccess -> {
+                name = meth.name.toString()
+                receiverType = meth.selected.type?.tsym.toString()
+                true
+            }
+            else -> {
+                if (meth.toString() in startOperations) {
+                    name = "stream"
+                    receiverType = methodInvocation.args.firstOrNull()?.type?.tsym.toString()
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        if (isVisitableMethod) {
             var beginLine: Int
             var beginColumn: Int
             var hasParam = false
-            val receiverType = meth.selected.type?.tsym.toString()
-            if (isStreamType(receiverType)) {
-                val name = meth.name.toString()
+
+            if (name in startOperations) {
+                streamOperations[actualStreamID]!!.add(StreamOperation(
+                    0,
+                    0,
+                    pos.getEndLine(methodInvocation) - 1,
+                    pos.getEndColumn(methodInvocation) - 1,
+                    "stream",
+                    streamOperations[actualStreamID]!!.size,
+                    false,
+                    "",
+                    actualStreamID
+                ))
+                openStreams.remove(actualStreamID)
+                actualStreamID = openStreams.lastOrNull() ?: -1
+            } else if (isStreamType(receiverType)) {
                 var firstArgAsString: String = ""
                 if (name in terminalOperations) {
                     actualStreamID = ++numberOfStreams
@@ -56,26 +87,12 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     beginColumn,
                     pos.getEndLine(methodInvocation) - 1,
                     pos.getEndColumn(methodInvocation) - 1,
-                    meth.name.toString(),
+                    name,
                     streamOperations[actualStreamID]!!.size,
                     hasParam,
                     firstArgAsString,
                     actualStreamID
                 ))
-            } else if (meth.name.toString() == "stream") {
-                streamOperations[actualStreamID]!!.add(StreamOperation(
-                    0,
-                    0,
-                    pos.getEndLine(methodInvocation) - 1,
-                    pos.getEndColumn(methodInvocation) - 1,
-                    "stream",
-                    streamOperations[actualStreamID]!!.size,
-                    false,
-                    "",
-                    actualStreamID
-                ))
-                openStreams.remove(actualStreamID)
-                actualStreamID = openStreams.lastOrNull() ?: -1
             }
         }
         super.visitApply(methodInvocation)
@@ -86,6 +103,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
     private var numberOfStreams = -1
     private var actualStreamID = -1
     private val terminalOperations = setOf("count", "max", "min", "reduce", "collect", "forEach", "toArray", "toList", "toSet", "findFirst", "findAny", "anyMatch", "allMatch", "noneMatch")
+    private val startOperations = setOf("stream", "intStream", "longStream", "doubleStream", "of", "range", "rangeClosed", "iterate", "generate")
     private var lambdaLevel = 0
 
     fun getStreamOperations(): List<StreamOperation> {

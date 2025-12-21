@@ -296,6 +296,7 @@ class JDIVirtualMachine(
             }
 
             "traceStream" -> {
+                println("Handling traceStream event...")
                 val direction = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("direction")!!) as StringReference).value()
                 val elemUntyped = javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!)
                 var valuetype = elemUntyped.type().name()
@@ -364,7 +365,7 @@ class JDIVirtualMachine(
                         // Helper: Formats a single element (String literal or UniqueID)
                         fun formatElement(elem: Value?): String {
                             return when (elem) {
-                                is StringReference -> "${elem.uniqueID()}"
+                                is StringReference -> elem.toString().replace("\"", "")
                                 is ObjectReference -> "${elem.uniqueID()}"
                                 else -> elem?.toString() ?: "null"
                             }
@@ -376,7 +377,7 @@ class JDIVirtualMachine(
 
                             // Case A: It's a native Array (String[], Object[], etc.)
                             if (v is ArrayReference) {
-                                return "REF${v.uniqueID()}"
+                                return "${v.uniqueID()}"
                                 //return v.values.joinToString(prefix = "[", postfix = "]", transform = ::formatElement)
                             }
 
