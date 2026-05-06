@@ -37,6 +37,7 @@ class JDIVirtualMachine(
 
     lateinit var prevTraceState: TraceState
         private set
+    private var latestSingleStepStartTime: Long = 0
     private var previousTraceStateTime: Long = 0
 
     // Stack depth -> Conditions declared in respective stack depth
@@ -94,6 +95,7 @@ class JDIVirtualMachine(
     }
 
     override fun handleSingleStep(): StepResult? {
+        latestSingleStepStartTime = System.currentTimeMillis()
         try {
             val eventSet: EventSet = nativeVM.eventQueue().remove(1000) ?: return StepResult(isWaitingForInput = true)
 
@@ -209,7 +211,7 @@ class JDIVirtualMachine(
     private fun uri(event: LocatableEvent): String { // TODO: add test
         val className = event.location().declaringType().name()
         val info = parseInfoByTypeNames[className]
-        if(info != null) {
+        if (info != null) {
             return info.localUri
         } else {
             println("WARNING: could not resolve uri of $className.")
@@ -221,6 +223,9 @@ class JDIVirtualMachine(
         sourceFileUri: String,
         event: LocatableEvent,
     ): TraceState {
+        val stepDiffTime = System.currentTimeMillis() - latestSingleStepStartTime
+        val traceStateDiffTime = System.currentTimeMillis() - previousTraceStateTime
+
         val inputBufferInfo = inputBufferTracer.getInputBufferInfo(event.thread())
 
         val traceState = buildTraceState(
@@ -236,7 +241,9 @@ class JDIVirtualMachine(
             inputSinceLastStep,
             relevantClasses.toList(),
             inputBufferInfo,
-            internalClassPatterns
+            internalClassPatterns,
+            traceStateDiffTime,
+            stepDiffTime,
         )
 
         if (::prevTraceState.isInitialized) {
@@ -249,8 +256,8 @@ class JDIVirtualMachine(
         if (previousTraceStateTime == 0L) {
             previousTraceStateTime = System.currentTimeMillis()
         }
-        val diffTime = System.currentTimeMillis() - previousTraceStateTime
-        println("Time since last trace state: ${diffTime}ms")
+        println("Time since latest single step start time /\n'Time needed to build trace state': ${stepDiffTime}ms")
+        println("Time since last trace state: ${traceStateDiffTime}ms")
         previousTraceStateTime = System.currentTimeMillis()
 
         return traceState

@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+[1.8.0] (released on 2025-10-25)
+* JW-347: Fix :backend:copyRuntimeLibrariesToLib introduced by Gradle version upgrade
+
+[1.7.9] (released on 2025-10-24)
+* JW-346: Move build logic out of extension project into root project
+
+[1.7.8] (released on 2025-10-22)
+* JW-333: Frontend suffers from strong performance degradation, especially when performing multi-step operations
+* JW-334: Add time tracking for step processing to trace states
+* JW-336: ArrayViz creates multiple index descriptors for same accessor
+* JW-340: ArrayViz does not have "aggregation animations" anymore.
+* JW-341: ArrayViz does not show "off-by-one" / ArrayIndexOutOfBoundsException highlighting
+* JW-342: Upgrade Java (21), Kotlin (2.2.20) and Gradle (8.14) version
+
+[1.7.7] (released on 2025-07-31)
+* JW-326: Various Sequence Diagram Fixes
+* JW-327: Add BibTex to Website
+* JW-328: Delete old /pages folder for website, use /docs instead
+* JW-329: Add info about publishing token management
+
 [1.7.6] (released on 2025-05-14)
 * JW-320: Remove duplicated Icons info in README.md
 * JW-321: Make "How to get" centered on narrow screen.
