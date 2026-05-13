@@ -25,10 +25,22 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
             is JCTree.JCFieldAccess -> {
                 name = meth.name.toString()
                 receiverType = meth.selected.type?.tsym.toString()
-                true
+                val returnType = methodInvocation.type?.tsym?.toString()
+
+                val isRealStreamOperation =
+                    isStreamType(receiverType) ||
+                            isStreamType(returnType)
+
+                isRealStreamOperation
             }
             else -> {
-                if (meth.toString() in startOperations) {
+                val methodName = meth.toString()
+                val owner = meth.type?.tsym?.owner?.toString() ?: ""
+                val isRealStreamFactory =
+                    methodName in startOperations &&
+                            owner == "java.util.stream"
+
+                if (isRealStreamFactory) {
                     name = "stream"
                     receiverType = methodInvocation.args.firstOrNull()?.type?.tsym.toString()
                     true
@@ -43,7 +55,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
             var hasParam = false
 
             if (name in startOperations) {
-                streamOperations[actualStreamID]!!.add(StreamOperation(
+                streamOperations[actualStreamID]?.add(StreamOperation(
                     0,
                     0,
                     pos.getEndLine(methodInvocation) - 1,
@@ -56,14 +68,14 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                 ))
                 openStreams.remove(actualStreamID)
                 actualStreamID = openStreams.lastOrNull() ?: -1
-            } else if (isStreamType(receiverType)) {
+            } else if (isStreamType(receiverType) && name != "concat") {
                 var firstArgAsString: String = ""
                 if (name in terminalOperations) {
                     actualStreamID = ++numberOfStreams
                     openStreams.add(numberOfStreams)
                     streamOperations[actualStreamID] = mutableListOf()
 
-                    if (methodInvocation.args.isNotEmpty()) {
+                    if (methodInvocation.args.isNotEmpty() && name != "forEach") {
                         hasParam = true
                         beginLine = pos.getBeginLineStreamOp(methodInvocation.args[0])
                         beginColumn = pos.getBeginColumn(methodInvocation.args[0]) - 1
@@ -77,12 +89,12 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                 }
 
                 if (methodInvocation.args.isNotEmpty()) {
-                    hasParam = true
+                    hasParam = name != "forEach"
                     firstArgAsString = methodInvocation.args[0].toString()
                     firstArgAsString = escapeForJavaString(firstArgAsString)
                 }
 
-                streamOperations[actualStreamID]!!.add(StreamOperation(
+                streamOperations[actualStreamID]?.add(StreamOperation(
                     beginLine,
                     beginColumn,
                     pos.getEndLine(methodInvocation) - 1,
@@ -93,6 +105,25 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                     firstArgAsString,
                     actualStreamID
                 ))
+
+                if (meth is JCTree.JCFieldAccess) {
+                    val selectedindent = meth.selected
+                    if (selectedindent is JCTree.JCIdent) {
+                        if (selectedindent.sym.kind.name == "VAR") {
+                            streamOperations[actualStreamID]?.add(StreamOperation(
+                                beginLine,
+                                beginColumn,
+                                beginLine,//pos.getEndLine(methodInvocation) - 1,
+                                beginColumn,//pos.getEndColumn(methodInvocation) - 1,
+                                "stream",
+                                streamOperations[actualStreamID]!!.size,
+                                hasParam,
+                                firstArgAsString,
+                                actualStreamID
+                            ))
+                        }
+                    }
+                }
             }
         }
         super.visitApply(methodInvocation)
@@ -104,7 +135,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
     private var actualStreamID = -1
     private val terminalOperations = setOf("count", "max", "min", "reduce", "collect", "forEach", "toArray", "toList", "toSet", "findFirst", "findAny", "anyMatch", "allMatch",
         "noneMatch", "sum")
-    private val startOperations = setOf("stream", "intStream", "longStream", "doubleStream", "of", "range", "rangeClosed", "iterate", "generate")
+    private val startOperations = setOf("stream", "intStream", "longStream", "doubleStream", "of", "range", "rangeClosed", "iterate", "generate", "empty")
     private var lambdaLevel = 0
 
     fun getStreamOperations(): List<StreamOperation> {

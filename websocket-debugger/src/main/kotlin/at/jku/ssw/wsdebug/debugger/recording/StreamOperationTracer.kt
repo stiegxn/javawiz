@@ -191,6 +191,12 @@ class StreamOperationTracer {
                 val sum = if (prev % 1.0 != 0.0 || current % 1.0 != 0.0) prev + current else (prev.toInt() + current.toInt())
                 addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "double", sum, param)
             }
+            "forEach" -> {
+                val lastInOp = lastInOps[actualStreamID]?.get(operationID)
+                val elemID = lastInOp?.elementID ?: elementcounter.also { elementcounter++ }
+                val parentIDs = (lastInOp?.parentIDs ?: mutableListOf()).toMutableList().apply { add(lastTraceValue!!.elementID) }
+                addStreamOperationValue(type, "END", operationID, elemID, parentIDs, "void", "forEach", param)
+            }
 //            "max" -> {
 //                val lastInOp = lastInOps[operationID]
 //                val newMax = lastInOp == null || lastInOp[actualStreamID]!!.value.toDouble() < lastTraceValue!!.value.toDouble()

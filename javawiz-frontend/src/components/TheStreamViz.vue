@@ -240,6 +240,8 @@ function render() {
               renderStringNode(group, d);
             } else if (isSmallerType(d.valuetype)) {
               renderSmallTypeNode(group, d);
+            } else if (d.valuetype === 'void') {
+              renderVoidNode(group, d);
             } else if (['List', 'Array', 'Set'].includes(d.valuetype)) {
               renderVerticalListNode(group, d);
             } else if (d.valuetype === 'Map') {
@@ -485,6 +487,22 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
       .attr('font-size', stringFontSize.get(templength) || '12px');
   }
 }
+
+function renderVoidNode(group: d3.Selection<SVGGElement, any, any, any>, d: any) {
+  group.append('ellipse')
+    .attr('rx', HALFWIDTH)
+    .attr('ry', RADIUS + 5)
+    .attr('stroke', '#000')
+    .attr('stroke-width', 3)
+    .attr('fill', '#FFF');
+
+  group.append('text')
+    .text(d.label)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'middle')
+    .attr('font-size', '16px');
+}
+
 
 function renderMiniCircleNode(
   group: d3.Selection<SVGGElement, any, any, any>,
