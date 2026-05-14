@@ -249,13 +249,11 @@ class StreamOperationTracer {
             }
             if (!lines.containsKey(op.operationID)) {
                 var yValue = (lines.values.maxByOrNull { it.y }?.y ?: -100) + 100
-                println("YValue for operation ${op.operationID} (${op.type}): $yValue")
                 if (yValue != 0) {
                     if (!arrayOf("int", "long", "double", "float", "boolean", "char", "byte", "short", "java.lang.String").contains(lastValueType)) {
                         yValue += 100
                     }
                 }
-                println("New YValue for operation ${op.operationID} (${op.type}): $yValue")
                 lines[op.operationID] = StreamOperationLine(op.type, yValue, op.valuetype, op.param)
             }
             if (op.seq > 0 || (op.direction == "IN" && op.type == "filter")) {
@@ -316,9 +314,6 @@ class StreamOperationTracer {
             }
         }
 
-        println(visualizationObjects.marblesToJson())
-        println(visualizationObjects.linksToJson())
-        println(visualizationObjects.linesToJson())
         return visualizationObjects
     }
 

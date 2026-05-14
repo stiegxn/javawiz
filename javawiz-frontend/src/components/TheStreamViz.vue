@@ -118,19 +118,19 @@ const miniStringLength = new Map<number, number>([
 ]);
 
 const stringFontSize = new Map<number, string>([
-    [1, '16px'],
-    [2, '16px'],
-    [3, '16px'],
-    [4, '16px'],
-    [5, '16px'],
-    [6, '16px'],
-    [7, '16px'],
-    [8, '15px'],
-    [9, '15px'],
-    [10, '14px'],
-    [11, '14px'],
-    [12, '13px'],
-    [13, '13px']
+  [1, '16px'],
+  [2, '16px'],
+  [3, '16px'],
+  [4, '16px'],
+  [5, '16px'],
+  [6, '16px'],
+  [7, '16px'],
+  [8, '15px'],
+  [9, '15px'],
+  [10, '14px'],
+  [11, '14px'],
+  [12, '13px'],
+  [13, '13px']
 ])
 
 let svg: any;
@@ -143,7 +143,6 @@ let zoom = d3.zoom()
 let lastNodeX: number;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let animationSpeed = 800;
-let mapKeys: string[][];
 
 // Hilfsfunktion: Für jede ID nur den neuesten Knoten (max step <= currentStep) auswählen
 function getVisibleNodesAtStep(nodes: any, step: number) {
@@ -181,8 +180,6 @@ function cancelEdit() {
 }
 
 function render() {
-  console.log('TraceState: ');
-  console.log(generalStore.currentTraceData);
   const visibleNodes = getVisibleNodesAtStep(allNodes.value, currentStep.value);
   const visibleNodeIds = new Set(visibleNodes.map(n => n.elemId));
   const visibleLinks = Array.from(d3.group(
@@ -315,7 +312,6 @@ function render() {
           src.valuetype.substring(0, src.valuetype.length - 2) :
           src.valuetype;
         if (!isSmallerType(type) && type !== 'java.lang.String') {
-          console.log(`node-${src.elemId}`);
           const safeId = CSS.escape(`node-${src.elemId}`);
           const node = d3.select(`#${safeId}`) as d3.Selection<SVGGElement, any, any, any>;
           const bbox = node.node()?.getBBox();
@@ -456,8 +452,6 @@ function renderObjectNode(group: d3.Selection<SVGGElement, any, any, any>, d: an
     group.append('text')
       .text(() => {
         const object = result[i].value;
-        console.log('Heap:');
-        console.log(heap.value);
         if (object.reference) {
           let refobject = heap.value?.find(obj => obj.id === object.reference) as HeapString;
           let t = refobject?.string;
@@ -706,8 +700,6 @@ function renderHorizontalListNode(group: d3.Selection<SVGGElement, any, any, any
       let label = elems[i].value.primitiveValue;
       renderMiniCircleNode(group, fontsize, label, circlewidth);
     } else {
-      console.log('Rendering element node inside horizontal list:');
-      console.log(elemNode);
       if (elemNode.type === 'java.lang.String') {
         group.append('rect')
           .attr('x', -HALFWIDTH + i * (WIDTH / length) + (WIDTH / length) / 2 - HALFWIDTH / length)

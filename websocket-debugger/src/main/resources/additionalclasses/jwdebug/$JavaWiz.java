@@ -38,7 +38,6 @@ public class $JavaWiz {
                 (acc, t) -> {
                     int hashbefore = acc.hashCode();
                     base.accumulator().accept(acc, t);
-                    System.out.println("before: " + hashbefore + " after: " + acc.hashCode());
                     if (hashbefore != acc.hashCode()) {
                         traceStream("END", acc, name, id, streamId, paramAsString, acc.toString());
                     } else {

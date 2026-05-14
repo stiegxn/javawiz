@@ -303,7 +303,6 @@ class JDIVirtualMachine(
             }
 
             "traceStream" -> {
-                println("Handling traceStream event...")
                 val direction = (javaWizFrame.getValue(javaWizFrame.visibleVariableByName("direction")!!) as StringReference).value()
                 val elemUntyped = javaWizFrame.getValue(javaWizFrame.visibleVariableByName("elem")!!)
                 var valuetype = elemUntyped.type().name()
@@ -462,11 +461,9 @@ class JDIVirtualMachine(
                                     }
                                 }
                                 value = mapBuilder.toString()
-                                println("Inspected Map entries via JDI: $value")
                             }
                         }
                     } catch (e: Exception) {
-                        println("Failed to inspect Map entries via JDI: ${e.message}")
                         value = "Map(Error: ${e.message})"
                     } finally {
                         previouslyEnabledEventRequests.forEach { it.enable() }
@@ -478,16 +475,8 @@ class JDIVirtualMachine(
                     "OUT" -> streamOperationTracer.traceOutStream(operationName, operationId, value, valuetype, streamId, param)
                     "END" -> streamOperationTracer.traceEndStream(operationName, operationId, streamId, param, if(isMap) value.toString() else null)
                     "NOP" -> streamOperationTracer.traceNOPEndStream(operationId)
-                    else -> error("unknown direction for stream element")//streamOperationTracer.addStreamOperationValue(operationName, direction, operationId, 0, mutableListOf
-                // (0), value)
+                    else -> error("unknown direction for stream element")
                 }
-
-                // For Testing only, delete later
-                println("Test value")
-                println("Stream operation: $direction, $value, ${elemUntyped.type()}, $operationName, $operationId")
-                println(streamOperationTracer.sequenceCounter)
-                println(streamOperationTracer.lastTraceValue)
-                println(streamOperationTracer.streamtrace)
             }
 
             "traceParam" -> {
