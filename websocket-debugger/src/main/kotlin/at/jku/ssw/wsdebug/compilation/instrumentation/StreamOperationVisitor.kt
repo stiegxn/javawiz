@@ -38,7 +38,7 @@ class StreamOperationVisitor(val pos: Positioning) : TreeScanner() {
                 val owner = meth.type?.tsym?.owner?.toString() ?: ""
                 val isRealStreamFactory =
                     methodName in startOperations &&
-                            owner == "java.util.stream"
+                            (owner == "java.util.stream" || owner == "")
 
                 if (isRealStreamFactory) {
                     name = "stream"
