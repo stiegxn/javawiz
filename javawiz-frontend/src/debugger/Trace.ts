@@ -100,7 +100,6 @@ export class Trace {
   }
 
   private getStreamVizInfo (stateIndex: number): StreamVizInfo {
-    console.log(this.trace[stateIndex])
     return this.trace[stateIndex].streamVizInfo
   }
 
