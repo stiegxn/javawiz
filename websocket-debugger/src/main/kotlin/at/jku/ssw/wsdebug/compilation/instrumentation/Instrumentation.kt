@@ -30,9 +30,14 @@ fun modificationPoints(conditions: List<Condition>, arrayAccessIndexWrappers: Li
             // Glücklicherweise ist die ID immer 0, wenn es sich um die Terminal-Operation handelt.
             if (it.id == 0) {
                 if (it.hasParam) {
-                    inserts.add(Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceParam(\"" + it.name + "\", " + it.id + ", " + it.streamID + ", \"" + it
-                        .param + "\", "))
-                    inserts.add(Insert(it.endLine, it.endColumn, "); $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.collectAndTransformStreamOperationValues()"))
+                    if (it.name == "") {
+                        inserts.add(Insert(it.beginLine, it.beginColumn, "$JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceParam(\"" + it.name + "\", " + it.id + ", " + it.streamID + ", \"" + it
+                            .param + "\", "))
+                        inserts.add(Insert(it.endLine, it.endColumn, "); $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.collectAndTransformStreamOperationValues()"))
+                    }
+                    else {
+                        inserts.add(Insert(it.endLine, it.endColumn, "; $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.collectAndTransformStreamOperationValues()"))
+                    }
                 } else {
                     inserts.add(Insert(it.beginLine, it.beginColumn, ".peek(x -> $JAVAWIZ_PACKAGE.$JAVAWIZ_CLASS.traceStream(\"END\", x, \"" + it.name + "\", 0, "
                     + it.streamID + ", \"" + it.param + "\")" +
